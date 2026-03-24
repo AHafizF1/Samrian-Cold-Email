@@ -10,7 +10,8 @@
  */
 
 import { internalAction } from "../_generated/server";
-import { parseSpintax, replaceVariables, previewTemplate } from "../lib/spintax";
+import { parseSpintax, replaceVariables, validateSpintax } from "../lib/spintax";
+import { previewTemplate } from "../lib/templateValidator";
 
 export const runTests = internalAction({
   args: {},
@@ -94,7 +95,27 @@ export const runTests = internalAction({
       }
     });
 
-    // Test 7: Variable replacement with existing variables
+    // Test 7: validateSpintax handles empty options
+    test("validateSpintax flags empty spintax options", () => {
+      const inputs = ["{Hi|}", "{|Hi}", "{Hi||Hello}", "{}"];
+      for (const input of inputs) {
+        const validation = validateSpintax(input);
+        if (validation.valid) {
+          throw new Error(`Expected "${input}" to be invalid`);
+        }
+      }
+    });
+
+    // Test 8: validateSpintax ignores template variables
+    test("validateSpintax ignores template variables", () => {
+      const input = "Hi {{firstName}}, how are you?";
+      const validation = validateSpintax(input);
+      if (!validation.valid) {
+        throw new Error(`Expected "${input}" to be valid, got: ` + validation.errors.join(", "));
+      }
+    });
+
+    // Test 9: Variable replacement with existing variables
     test("replaceVariables replaces existing variables", () => {
       const input = "Hi {{firstName}}, welcome to {{company}}!";
       const vars = { firstName: "John", company: "Acme Corp" };

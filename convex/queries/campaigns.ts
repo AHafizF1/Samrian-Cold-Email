@@ -27,7 +27,14 @@ export const list = query({
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .collect();
 
-    return campaigns;
+    return campaigns.map((c) => ({
+      _id: c._id,
+      _creationTime: c._creationTime,
+      orgId: c.orgId,
+      name: c.name,
+      status: c.status,
+      schedule: c.schedule,
+    }));
   },
 });
 
@@ -61,7 +68,14 @@ export const get = query({
       return null;
     }
 
-    return campaign;
+    return {
+      _id: campaign._id,
+      _creationTime: campaign._creationTime,
+      orgId: campaign.orgId,
+      name: campaign.name,
+      status: campaign.status,
+      schedule: campaign.schedule,
+    };
   },
 });
 
@@ -89,10 +103,16 @@ export const getByStatus = query({
 
     const campaigns = await ctx.db
       .query("campaigns")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .withIndex("by_org_status", (q) => q.eq("orgId", orgId).eq("status", args.status))
       .collect();
 
-    // Filter by status
-    return campaigns.filter((campaign) => campaign.status === args.status);
+    return campaigns.map((c) => ({
+      _id: c._id,
+      _creationTime: c._creationTime,
+      orgId: c.orgId,
+      name: c.name,
+      status: c.status,
+      schedule: c.schedule,
+    }));
   },
 });

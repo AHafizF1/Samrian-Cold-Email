@@ -6,21 +6,45 @@
  */
 
 /**
- * Interface for email templates
+ * Validate spintax syntax.
+ * Checks for unbalanced braces and other syntax errors.
+ *
+ * @param text - Text specifying spintax formatting
+ * @returns Object indicating validity and any errors
  */
-export interface EmailTemplate {
-  subject: string;
-  body: string;
-}
+export function validateSpintax(text: string): { valid: boolean; errors: string[] } {
+  // Protect template variables from check
+  const variableRegex = /\{\{\w+\}\}/g;
+  const textWithoutVars = text.replace(variableRegex, "____");
 
-/**
- * Interface for preview results
- */
-export interface PreviewResult {
-  subject: string;
-  body: string;
-  variables: string[];
-  missingVariables: string[];
+  const errors: string[] = [];
+  let braceCount = 0;
+
+  for (let i = 0; i < textWithoutVars.length; i++) {
+    const char = textWithoutVars[i];
+    if (char === "{") braceCount++;
+    if (char === "}") {
+      braceCount--;
+      if (braceCount < 0) {
+        errors.push("Unbalanced braces: closing brace without matching opening brace");
+        braceCount = 0; // Prevent cascade
+      }
+    }
+  }
+
+  if (braceCount > 0) {
+    errors.push(`Unbalanced braces: unclosed opening brace`);
+  }
+
+  // Check for empty options like {|} or {}
+  if (/\{\|/.test(textWithoutVars) || /\|\}/.test(textWithoutVars) || /\|\|/.test(textWithoutVars) || /\{\}/.test(textWithoutVars)) {
+    errors.push("Empty spintax options found (e.g., {|} or {})");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }
 
 /**
@@ -34,6 +58,12 @@ export interface PreviewResult {
  * Requirements: 9.1, 9.2, 9.3, 9.4
  */
 export function parseSpintax(text: string, preview: boolean = false): string {
+  // Check valid syntax first
+  const validation = validateSpintax(text);
+  if (!validation.valid) {
+    throw new Error(validation.errors[0]);
+  }
+
   // First, temporarily replace {{variable}} patterns to protect them from spintax processing
   const variablePlaceholders: string[] = [];
   const variableRegex = /\{\{(\w+)\}\}/g;
@@ -42,19 +72,6 @@ export function parseSpintax(text: string, preview: boolean = false): string {
     variablePlaceholders.push(match);
     return placeholder;
   });
-
-  // Check for unbalanced braces (after protecting variables)
-  let braceCount = 0;
-  for (const char of textWithPlaceholders) {
-    if (char === "{") braceCount++;
-    if (char === "}") braceCount--;
-    if (braceCount < 0) {
-      throw new Error("Unbalanced braces: closing brace without matching opening brace");
-    }
-  }
-  if (braceCount !== 0) {
-    throw new Error("Unbalanced braces: unclosed opening brace");
-  }
 
   // Process nested spintax from innermost to outermost
   let result = textWithPlaceholders;
@@ -125,62 +142,4 @@ export function replaceVariables(text: string, variables: Record<string, string>
   });
 
   return result;
-}
-
-/**
- * Extract all variable names from text.
- *
- * @param text - Text containing variable patterns
- * @returns Array of unique variable names found
- */
-function extractVariables(text: string): string[] {
-  const variableRegex = /\{\{(\w+)\}\}/g;
-  const variables = new Set<string>();
-
-  let match;
-  while ((match = variableRegex.exec(text)) !== null) {
-    variables.add(match[1]);
-  }
-
-  return Array.from(variables);
-}
-
-/**
- * Preview a template with sample contact data.
- *
- * Processes both spintax and variables, returning the final output along with
- * metadata about variables found and missing.
- *
- * @param template - Email template with subject and body
- * @param sampleContact - Contact data with customVars for variable replacement
- * @returns Preview result with processed text and variable metadata
- *
- * Requirements: 10.3, 10.4, 10.5
- */
-export function previewTemplate(
-  template: EmailTemplate,
-  sampleContact: { customVars: Record<string, string> }
-): PreviewResult {
-  // Extract all variables from both subject and body before processing
-  const subjectVariables = extractVariables(template.subject);
-  const bodyVariables = extractVariables(template.body);
-  const allVariables = Array.from(new Set([...subjectVariables, ...bodyVariables]));
-
-  // Identify missing variables
-  const missingVariables = allVariables.filter((varName) => !(varName in sampleContact.customVars));
-
-  // Process spintax first (in preview mode - deterministic)
-  const subjectAfterSpintax = parseSpintax(template.subject, true);
-  const bodyAfterSpintax = parseSpintax(template.body, true);
-
-  // Then replace variables
-  const finalSubject = replaceVariables(subjectAfterSpintax, sampleContact.customVars);
-  const finalBody = replaceVariables(bodyAfterSpintax, sampleContact.customVars);
-
-  return {
-    subject: finalSubject,
-    body: finalBody,
-    variables: allVariables,
-    missingVariables,
-  };
 }

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 import { requireOrgAccess, verifyOrgOwnership } from "../lib/auth";
+import { rateLimit } from "../lib/rateLimiter";
 import {
   CONTACT_STATUSES,
   isValidTimestamp,
@@ -17,6 +18,7 @@ export const assign = mutation({
   returns: v.id("campaignContacts"),
   handler: async (ctx, args) => {
     const { orgId } = await requireOrgAccess(ctx, { campaign: ["update"] });
+    await rateLimit.limit(ctx, "campaignContact:assign", { key: orgId, throws: true });
 
     // Verify campaign belongs to user's organization
     const campaign = await ctx.db.get(args.campaignId);
@@ -26,11 +28,12 @@ export const assign = mutation({
     const contact = await ctx.db.get(args.contactId);
     await verifyOrgOwnership(contact, orgId, "Contact");
 
-    // Check for duplicate assignment
+    // Check for duplicate assignment using O(1) compound index
     const existingAssignment = await ctx.db
       .query("campaignContacts")
-      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
-      .filter((q) => q.eq(q.field("contactId"), args.contactId))
+      .withIndex("by_contact_campaign", (q) =>
+        q.eq("contactId", args.contactId).eq("campaignId", args.campaignId)
+      )
       .first();
 
     if (existingAssignment) {
@@ -124,10 +127,16 @@ export const bulkAssign = mutation({
   }),
   handler: async (ctx, args) => {
     const { orgId } = await requireOrgAccess(ctx, { campaign: ["update"] });
+    await rateLimit.limit(ctx, "campaignContact:bulkAssign", { key: orgId, throws: true });
 
     // Verify campaign belongs to user's organization
     const campaign = await ctx.db.get(args.campaignId);
     await verifyOrgOwnership(campaign, orgId, "Campaign");
+
+    const MAX_BATCH_SIZE = 500;
+    if (args.contactIds.length > MAX_BATCH_SIZE) {
+      throw new Error(`bulkAssign is limited to ${MAX_BATCH_SIZE} contacts per request to avoid transaction timeouts.`);
+    }
 
     const success: Id<"campaignContacts">[] = [];
     const errors: { index: number; error: string }[] = [];
@@ -141,11 +150,12 @@ export const bulkAssign = mutation({
         const contact = await ctx.db.get(contactId);
         await verifyOrgOwnership(contact, orgId, "Contact");
 
-        // Check for duplicate assignment
+        // Check for duplicate assignment using O(1) compound index
         const existingAssignment = await ctx.db
           .query("campaignContacts")
-          .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
-          .filter((q) => q.eq(q.field("contactId"), contactId))
+          .withIndex("by_contact_campaign", (q) =>
+            q.eq("contactId", contactId).eq("campaignId", args.campaignId)
+          )
           .first();
 
         if (existingAssignment) {

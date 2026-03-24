@@ -104,45 +104,35 @@ export const getByEmail = query({
 export const search = query({
   args: {
     query: v.string(),
+    numItems: v.optional(v.number()),
+    cursor: v.optional(v.string()),
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("contacts"),
-      _creationTime: v.number(),
-      orgId: v.string(),
-      email: v.string(),
-      customVars: v.any(),
-      timezone: v.optional(v.string()),
-      bounceStatus: v.optional(v.string()),
-    })
-  ),
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("contacts"),
+        _creationTime: v.number(),
+        orgId: v.string(),
+        email: v.string(),
+        customVars: v.any(),
+        timezone: v.optional(v.string()),
+        bounceStatus: v.optional(v.string()),
+      })
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
   handler: async (ctx, args) => {
     const { orgId } = await requireOrgAccess(ctx);
 
-    const searchQuery = args.query.toLowerCase();
+    const limit = args.numItems ?? 100;
 
-    // Get all contacts for the organization
-    const contacts = await ctx.db
+    // Use native search index with orgId scoped filter
+    return await ctx.db
       .query("contacts")
-      .withIndex("by_org_email", (q) => q.eq("orgId", orgId))
-      .collect();
-
-    // Search across email and customVars fields
-    return contacts.filter((contact) => {
-      // Search in email
-      if (contact.email.toLowerCase().includes(searchQuery)) {
-        return true;
-      }
-
-      // Search in customVars values
-      if (contact.customVars && typeof contact.customVars === "object") {
-        const customVarsValues = Object.values(contact.customVars);
-        return customVarsValues.some(
-          (value) => typeof value === "string" && value.toLowerCase().includes(searchQuery)
-        );
-      }
-
-      return false;
-    });
+      .withSearchIndex("search_email", (q) =>
+        q.search("email", args.query).eq("orgId", orgId)
+      )
+      .paginate({ cursor: args.cursor ?? null, numItems: limit });
   },
 });

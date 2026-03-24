@@ -1,4 +1,5 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 import { authComponent, createAuth } from "../betterAuth/auth";
 
 type Ctx = QueryCtx | MutationCtx;
@@ -53,6 +54,46 @@ export async function verifyOrgOwnership<T extends { orgId: string } | null>(
   }
 
   return resource as Exclude<T, null>;
+}
+
+/**
+ * Verifies that a mailbox belongs to the user's organization.
+ * Throws if the mailbox doesn't exist or belongs to a different org.
+ */
+export async function verifyMailboxOwnership(
+  ctx: QueryCtx | MutationCtx,
+  mailboxId: Id<"mailboxes">
+): Promise<{ orgId: string }> {
+  const { orgId } = await requireOrgAccess(ctx);
+  const mailbox = await ctx.db.get(mailboxId);
+  await verifyOrgOwnership(mailbox, orgId, "Mailbox");
+  return { orgId };
+}
+
+/**
+ * Verifies that a campaign belongs to the user's organization.
+ */
+export async function verifyCampaignOwnership(
+  ctx: QueryCtx | MutationCtx,
+  campaignId: Id<"campaigns">
+): Promise<{ orgId: string }> {
+  const { orgId } = await requireOrgAccess(ctx);
+  const campaign = await ctx.db.get(campaignId);
+  await verifyOrgOwnership(campaign, orgId, "Campaign");
+  return { orgId };
+}
+
+/**
+ * Verifies that a contact belongs to the user's organization.
+ */
+export async function verifyContactOwnership(
+  ctx: QueryCtx | MutationCtx,
+  contactId: Id<"contacts">
+): Promise<{ orgId: string; email: string }> {
+  const { orgId } = await requireOrgAccess(ctx);
+  const contact = await ctx.db.get(contactId);
+  await verifyOrgOwnership(contact, orgId, "Contact");
+  return { orgId, email: contact!.email };
 }
 
 /**

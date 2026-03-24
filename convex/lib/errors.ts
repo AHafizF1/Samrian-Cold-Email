@@ -48,6 +48,24 @@ export class ConflictError extends AppError {
   }
 }
 
+export class MailboxConnectionError extends AppError {
+  constructor(message: string, public provider: string) {
+    super(message, "MAILBOX_CONNECTION_ERROR", 503);
+  }
+}
+
+export class TokenRefreshError extends AppError {
+  constructor(message: string, public provider: string) {
+    super(message, "TOKEN_REFRESH_ERROR", 401);
+  }
+}
+
+export class SendingLimitError extends AppError {
+  constructor(public mailboxId: string, public limit: number) {
+    super(`Daily sending limit of ${limit} reached`, "SENDING_LIMIT_ERROR", 429);
+  }
+}
+
 /**
  * Format error for API response
  */

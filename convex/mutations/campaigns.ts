@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { requireOrgAccess, verifyOrgOwnership, cascadeDeleteAssignments } from "../lib/auth";
+import { rateLimit } from "../lib/rateLimiter";
+import { writeAuditLog } from "../lib/auditLog";
 import {
   CAMPAIGN_STATUSES,
   VALID_DAYS,
@@ -9,10 +11,9 @@ import {
   isStartBeforeEnd,
   isValidCampaignStatus,
   isValidDay,
-  type CampaignStatus,
 } from "../lib/validators";
 
-// Schedule validator
+// ── Shared Validators (DRY) ──────────────────────────────────────
 const scheduleValidator = v.object({
   defaultTimezone: v.string(),
   daysAllowed: v.array(v.string()),
@@ -20,62 +21,108 @@ const scheduleValidator = v.object({
   endTime: v.string(),
 });
 
+const stepsValidator = v.array(
+  v.object({
+    subject: v.string(),
+    body: v.string(),
+  })
+);
+
+type ScheduleInput = {
+  defaultTimezone: string;
+  daysAllowed: string[];
+  startTime: string;
+  endTime: string;
+};
+
+/**
+ * Validate a campaign schedule object.
+ * Extracted to avoid duplicating the same 15-line block in create + update.
+ */
+function validateSchedule(schedule: ScheduleInput): void {
+  if (!isValidTimezone(schedule.defaultTimezone)) {
+    throw new Error(`Invalid timezone: ${schedule.defaultTimezone}`);
+  }
+
+  if (schedule.daysAllowed.length === 0) {
+    throw new Error("Schedule must have at least one allowed day");
+  }
+
+  for (const day of schedule.daysAllowed) {
+    if (!isValidDay(day)) {
+      throw new Error(`Invalid day: ${day}. Must be one of: ${VALID_DAYS.join(", ")}`);
+    }
+  }
+
+  if (!isValidTimeFormat(schedule.startTime)) {
+    throw new Error(`Invalid startTime format: ${schedule.startTime}. Must be HH:MM`);
+  }
+
+  if (!isValidTimeFormat(schedule.endTime)) {
+    throw new Error(`Invalid endTime format: ${schedule.endTime}. Must be HH:MM`);
+  }
+
+  if (!isStartBeforeEnd(schedule.startTime, schedule.endTime)) {
+    throw new Error("startTime must be before endTime");
+  }
+}
+
+/**
+ * Validate campaign steps array.
+ */
+function validateSteps(steps: Array<{ subject: string; body: string }>): void {
+  if (steps.length === 0) {
+    throw new Error("Campaign must have at least one step");
+  }
+
+  for (const [index, step] of steps.entries()) {
+    if (!step.subject.trim() || !step.body.trim()) {
+      throw new Error(`Step ${index + 1} must have a subject and body`);
+    }
+  }
+}
+
+// ── Mutations ────────────────────────────────────────────────────
+
 export const create = mutation({
   args: {
     name: v.string(),
     status: v.string(),
     schedule: scheduleValidator,
+    steps: stepsValidator,
   },
   returns: v.id("campaigns"),
   handler: async (ctx, args) => {
-    const { orgId } = await requireOrgAccess(ctx, { campaign: ["create"] });
+    const { user, orgId } = await requireOrgAccess(ctx, { campaign: ["create"] });
+    await rateLimit.limit(ctx, "campaign:create", { key: orgId, throws: true });
 
-    // Validate name length
     if (args.name.length < 1 || args.name.length > 200) {
       throw new Error("Campaign name must be between 1 and 200 characters");
     }
 
-    // Validate status enum
     if (!isValidCampaignStatus(args.status)) {
       throw new Error(`Invalid status. Must be one of: ${CAMPAIGN_STATUSES.join(", ")}`);
     }
 
-    // Validate timezone
-    if (!isValidTimezone(args.schedule.defaultTimezone)) {
-      throw new Error(`Invalid timezone: ${args.schedule.defaultTimezone}`);
-    }
+    validateSchedule(args.schedule);
+    validateSteps(args.steps);
 
-    // Validate daysAllowed
-    if (args.schedule.daysAllowed.length === 0) {
-      throw new Error("Schedule must have at least one allowed day");
-    }
-
-    for (const day of args.schedule.daysAllowed) {
-      if (!isValidDay(day)) {
-        throw new Error(`Invalid day: ${day}. Must be one of: ${VALID_DAYS.join(", ")}`);
-      }
-    }
-
-    // Validate time format
-    if (!isValidTimeFormat(args.schedule.startTime)) {
-      throw new Error(`Invalid startTime format: ${args.schedule.startTime}. Must be HH:MM`);
-    }
-
-    if (!isValidTimeFormat(args.schedule.endTime)) {
-      throw new Error(`Invalid endTime format: ${args.schedule.endTime}. Must be HH:MM`);
-    }
-
-    // Validate startTime < endTime
-    if (!isStartBeforeEnd(args.schedule.startTime, args.schedule.endTime)) {
-      throw new Error("startTime must be before endTime");
-    }
-
-    return await ctx.db.insert("campaigns", {
+    const id = await ctx.db.insert("campaigns", {
       orgId,
       name: args.name,
       status: args.status,
       schedule: args.schedule,
+      steps: args.steps,
     });
+
+    await writeAuditLog(ctx, {
+      orgId,
+      userId: user._id,
+      action: "campaign.create",
+      details: `Created campaign "${args.name}" with ${args.steps.length} step(s)`,
+    });
+
+    return id;
   },
 });
 
@@ -84,21 +131,22 @@ export const update = mutation({
     id: v.id("campaigns"),
     name: v.optional(v.string()),
     schedule: v.optional(scheduleValidator),
+    steps: v.optional(stepsValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const { orgId } = await requireOrgAccess(ctx, { campaign: ["update"] });
+    await rateLimit.limit(ctx, "campaign:update", { key: orgId, throws: true });
 
-    // Verify campaign belongs to user's organization
     const campaign = await ctx.db.get(args.id);
     await verifyOrgOwnership(campaign, orgId, "Campaign");
 
     const updates: Partial<{
       name: string;
       schedule: typeof args.schedule;
+      steps: typeof args.steps;
     }> = {};
 
-    // Validate and add name if provided
     if (args.name !== undefined) {
       if (args.name.length < 1 || args.name.length > 200) {
         throw new Error("Campaign name must be between 1 and 200 characters");
@@ -106,39 +154,14 @@ export const update = mutation({
       updates.name = args.name;
     }
 
-    // Validate and add schedule if provided
     if (args.schedule !== undefined) {
-      // Validate timezone
-      if (!isValidTimezone(args.schedule.defaultTimezone)) {
-        throw new Error(`Invalid timezone: ${args.schedule.defaultTimezone}`);
-      }
-
-      // Validate daysAllowed
-      if (args.schedule.daysAllowed.length === 0) {
-        throw new Error("Schedule must have at least one allowed day");
-      }
-
-      for (const day of args.schedule.daysAllowed) {
-        if (!isValidDay(day)) {
-          throw new Error(`Invalid day: ${day}. Must be one of: ${VALID_DAYS.join(", ")}`);
-        }
-      }
-
-      // Validate time format
-      if (!isValidTimeFormat(args.schedule.startTime)) {
-        throw new Error(`Invalid startTime format: ${args.schedule.startTime}. Must be HH:MM`);
-      }
-
-      if (!isValidTimeFormat(args.schedule.endTime)) {
-        throw new Error(`Invalid endTime format: ${args.schedule.endTime}. Must be HH:MM`);
-      }
-
-      // Validate startTime < endTime
-      if (!isStartBeforeEnd(args.schedule.startTime, args.schedule.endTime)) {
-        throw new Error("startTime must be before endTime");
-      }
-
+      validateSchedule(args.schedule);
       updates.schedule = args.schedule;
+    }
+
+    if (args.steps !== undefined) {
+      validateSteps(args.steps);
+      updates.steps = args.steps;
     }
 
     await ctx.db.patch(args.id, updates);
@@ -153,31 +176,33 @@ export const updateStatus = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { orgId } = await requireOrgAccess(ctx, { campaign: ["update"] });
+    const { user, orgId } = await requireOrgAccess(ctx, { campaign: ["update"] });
 
-    // Verify campaign belongs to user's organization
     const campaign = await ctx.db.get(args.id);
     await verifyOrgOwnership(campaign, orgId, "Campaign");
 
-    // Validate status enum
     if (!isValidCampaignStatus(args.status)) {
       throw new Error(`Invalid status. Must be one of: ${CAMPAIGN_STATUSES.join(", ")}`);
     }
 
-    // Validate status transitions
     const currentStatus = campaign!.status;
-    const newStatus = args.status;
-
-    // Define invalid transitions
     const invalidTransitions: Record<string, string[]> = {
-      completed: ["draft", "active", "paused"], // completed cannot transition to anything
+      completed: ["draft", "active", "paused"],
     };
 
-    if (invalidTransitions[currentStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${currentStatus} to ${newStatus}`);
+    if (invalidTransitions[currentStatus]?.includes(args.status)) {
+      throw new Error(`Invalid status transition from ${currentStatus} to ${args.status}`);
     }
 
     await ctx.db.patch(args.id, { status: args.status });
+
+    await writeAuditLog(ctx, {
+      orgId,
+      userId: user._id,
+      action: "campaign.status_change",
+      details: `Campaign "${campaign!.name}" status: ${currentStatus} → ${args.status}`,
+    });
+
     return null;
   },
 });
@@ -186,17 +211,22 @@ export const remove = mutation({
   args: { id: v.id("campaigns") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { orgId } = await requireOrgAccess(ctx, { campaign: ["delete"] });
+    const { user, orgId } = await requireOrgAccess(ctx, { campaign: ["delete"] });
+    await rateLimit.limit(ctx, "campaign:delete", { key: orgId, throws: true });
 
-    // Verify campaign belongs to user's organization
     const campaign = await ctx.db.get(args.id);
     await verifyOrgOwnership(campaign, orgId, "Campaign");
 
-    // Cascade delete: remove all campaignContacts associated with this campaign
     await cascadeDeleteAssignments(ctx, "campaign", args.id);
-
-    // Delete the campaign
     await ctx.db.delete(args.id);
+
+    await writeAuditLog(ctx, {
+      orgId,
+      userId: user._id,
+      action: "campaign.delete",
+      details: `Deleted campaign "${campaign!.name}"`,
+    });
+
     return null;
   },
 });

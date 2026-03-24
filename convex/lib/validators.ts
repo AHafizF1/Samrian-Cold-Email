@@ -48,6 +48,30 @@ export const VALID_DAYS = [
 ] as const;
 export type DayOfWeek = (typeof VALID_DAYS)[number];
 
+/**
+ * Valid mailbox providers
+ */
+export const MAILBOX_PROVIDERS = ["puzzle", "mailpool", "google", "microsoft"] as const;
+export type MailboxProvider = (typeof MAILBOX_PROVIDERS)[number];
+
+/**
+ * Valid mailbox health statuses
+ */
+export const MAILBOX_STATUSES = ["active", "disconnected", "limit_reached"] as const;
+export type MailboxStatus = (typeof MAILBOX_STATUSES)[number];
+
+/**
+ * Valid email thread directions
+ */
+export const EMAIL_DIRECTIONS = ["sent", "received"] as const;
+export type EmailDirection = (typeof EMAIL_DIRECTIONS)[number];
+
+/**
+ * Valid do-not-contact reasons
+ */
+export const DNC_REASONS = ["unsubscribed", "bounced_hard", "manual"] as const;
+export type DncReason = (typeof DNC_REASONS)[number];
+
 // ============================================================
 // Validation Functions
 // ============================================================

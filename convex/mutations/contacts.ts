@@ -1,7 +1,9 @@
-import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { v, ConvexError } from "convex/values";
+import { mutation, internalMutation } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 import { requireOrgAccess, verifyOrgOwnership, cascadeDeleteAssignments } from "../lib/auth";
+import { rateLimit } from "../lib/rateLimiter";
+import { writeAuditLog } from "../lib/auditLog";
 import {
   CONTACT_STATUSES,
   BOUNCE_STATUSES,
@@ -24,6 +26,7 @@ export const create = mutation({
   returns: v.id("contacts"),
   handler: async (ctx, args) => {
     const { orgId } = await requireOrgAccess(ctx, { contact: ["create"] });
+    await rateLimit.limit(ctx, "contact:create", { key: orgId, throws: true });
 
     // Validate email format
     if (!isValidEmail(args.email)) {
@@ -141,7 +144,8 @@ export const remove = mutation({
   args: { id: v.id("contacts") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { orgId } = await requireOrgAccess(ctx, { contact: ["delete"] });
+    const { user, orgId } = await requireOrgAccess(ctx, { contact: ["delete"] });
+    await rateLimit.limit(ctx, "contact:delete", { key: orgId, throws: true });
 
     // Verify contact belongs to user's organization
     const contact = await ctx.db.get(args.id);
@@ -152,6 +156,14 @@ export const remove = mutation({
 
     // Delete the contact
     await ctx.db.delete(args.id);
+
+    await writeAuditLog(ctx, {
+      orgId,
+      userId: user._id,
+      action: "contact.delete",
+      details: `Deleted contact "${contact!.email}"`,
+    });
+
     return null;
   },
 });
@@ -177,7 +189,16 @@ export const bulkCreate = mutation({
     ),
   }),
   handler: async (ctx, args) => {
-    const { orgId } = await requireOrgAccess(ctx, { contact: ["import"] });
+    const { user, orgId } = await requireOrgAccess(ctx, { contact: ["import"] });
+    await rateLimit.limit(ctx, "contact:bulkCreate", { key: orgId, throws: true });
+
+    const MAX_BATCH_SIZE = 500;
+    if (args.contacts.length > MAX_BATCH_SIZE) {
+      throw new ConvexError({
+        code: "PAYLOAD_TOO_LARGE",
+        message: `bulkCreate is limited to ${MAX_BATCH_SIZE} contacts per request to avoid transaction timeouts.`,
+      });
+    }
 
     const success: Id<"contacts">[] = [];
     const errors: { index: number; error: string }[] = [];
@@ -189,7 +210,7 @@ export const bulkCreate = mutation({
       try {
         // Validate email format
         if (!isValidEmail(contactData.email)) {
-          throw new Error(`Invalid email format: ${contactData.email}`);
+          throw new ConvexError(`Invalid email format: ${contactData.email}`);
         }
 
         // Check email uniqueness within organization
@@ -199,18 +220,18 @@ export const bulkCreate = mutation({
           .first();
 
         if (existingContact) {
-          throw new Error(`Contact with email ${contactData.email} already exists in organization`);
+          throw new ConvexError(`Contact with email ${contactData.email} already exists in organization`);
         }
 
         // Validate customVars if provided
         const customVars = contactData.customVars ?? {};
         if (!isValidCustomVars(customVars)) {
-          throw new Error("customVars must be an object with string key-value pairs");
+          throw new ConvexError("customVars must be an object with string key-value pairs");
         }
 
         // Validate timezone if provided
         if (contactData.timezone !== undefined && !isValidTimezone(contactData.timezone)) {
-          throw new Error(`Invalid timezone: ${contactData.timezone}`);
+          throw new ConvexError(`Invalid timezone: ${contactData.timezone}`);
         }
 
         // Validate bounceStatus if provided
@@ -218,7 +239,7 @@ export const bulkCreate = mutation({
           contactData.bounceStatus !== undefined &&
           !isValidBounceStatus(contactData.bounceStatus)
         ) {
-          throw new Error(`Invalid bounceStatus. Must be one of: ${BOUNCE_STATUSES.join(", ")}`);
+          throw new ConvexError(`Invalid bounceStatus. Must be one of: ${BOUNCE_STATUSES.join(", ")}`);
         }
 
         // Insert the contact
@@ -231,15 +252,50 @@ export const bulkCreate = mutation({
         });
 
         success.push(contactId);
-      } catch (error) {
+      } catch (error: any) {
         // Record the error and continue processing
         errors.push({
           index: i,
-          error: error instanceof Error ? error.message : String(error),
+          error: error instanceof ConvexError ? (error.data as any).message ?? String(error.data) : error instanceof Error ? error.message : String(error),
         });
       }
     }
 
+    // Write audit log if any contacts were created
+    if (success.length > 0) {
+      await writeAuditLog(ctx, {
+        orgId,
+        userId: user._id,
+        action: "contact.bulk_create",
+        details: `Imported ${success.length} contacts (${errors.length} failed)`,
+      });
+    }
+
     return { success, errors };
+  },
+});
+
+/**
+ * System-level mutation for the bounce processing worker.
+ * Updates a contact's bounceStatus to "soft" or "hard".
+ */
+export const updateBounceStatus = internalMutation({
+  args: {
+    id: v.id("contacts"),
+    bounceStatus: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!isValidBounceStatus(args.bounceStatus)) {
+      throw new Error(`Invalid bounceStatus. Must be one of: ${BOUNCE_STATUSES.join(", ")}`);
+    }
+
+    const contact = await ctx.db.get(args.id);
+    if (!contact) {
+      throw new Error(`Contact ${args.id} not found`);
+    }
+
+    await ctx.db.patch(args.id, { bounceStatus: args.bounceStatus });
+    return null;
   },
 });
