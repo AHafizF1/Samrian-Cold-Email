@@ -1,52 +1,28 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuthSession } from "@/lib/auth";
 
 export default function Home() {
-  const user = useQuery(api.auth.getCurrentUser);
+  const router = useRouter();
+  const { data: session, isPending } = useAuthSession();
 
-  if (user === undefined) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!isPending) {
+      if (session?.user) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/sign-in");
+      }
+    }
+  }, [session, isPending, router]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-900 gap-6">
-      <h1 className="text-4xl font-bold tracking-tight">ColdEmail MVP</h1>
-      <div className="bg-white shadow-xl rounded-xl p-8 max-w-sm w-full text-center border">
-        {user ? (
-          <div className="space-y-4">
-            <p className="font-medium text-lg">Welcome back,</p>
-            <p className="text-gray-500">{user.email}</p>
-            <button
-              onClick={() => authClient.signOut()}
-              className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md font-medium transition-colors"
-            >
-              Sign Out
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-gray-600 mb-6">You must be logged in to access the dashboard.</p>
-            <a
-              href="/sign-in"
-              className="block w-full bg-black hover:bg-gray-800 text-white py-2 px-4 rounded-md font-medium transition-colors"
-            >
-              Sign In
-            </a>
-            <a
-              href="/sign-up"
-              className="block w-full border border-gray-300 hover:bg-gray-50 text-black py-2 px-4 rounded-md font-medium transition-colors"
-            >
-              Sign Up
-            </a>
-          </div>
-        )}
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-2">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     </div>
   );

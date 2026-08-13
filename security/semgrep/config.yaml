@@ -1,0 +1,3 @@
+# Registry rules are pinned by scripts/security/run.ts. Add local rules only after a
+# repeated Samrian-specific vulnerability pattern is validated.
+rules: []

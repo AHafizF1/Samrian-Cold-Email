@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
+import { requireActiveOrg } from "@/server/auth";
+import { createOAuthState } from "../../../../../lib/oauth-state";
+import { getStateCookieName } from "../../../../../lib/oauth-helpers";
+import { withPublicLimit } from "@/server/limits/http";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const SCOPES = [
@@ -8,23 +11,32 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
 ].join(" ");
 
-const STATE_COOKIE = "google_oauth_state";
-
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const mailboxId = searchParams.get("mailboxId");
+  return withPublicLimit(request, "oauth.google.start", (limitedRequest) =>
+    start(limitedRequest as NextRequest)
+  );
+}
 
+async function start(request: NextRequest) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   if (!clientId || !appUrl) {
-    return NextResponse.redirect(
-      `${appUrl ?? ""}/settings/mailboxes?error=missing_google_config`
-    );
+    return NextResponse.redirect(`${appUrl}/settings/mailboxes?error=missing_google_config`);
   }
 
-  // Generate random state for CSRF protection
-  const state = crypto.randomBytes(16).toString("hex");
+  let session;
+  try {
+    session = await requireActiveOrg();
+  } catch {
+    return NextResponse.redirect(`${appUrl}/sign-in?error=unauthenticated`);
+  }
+
+  const { searchParams } = request.nextUrl;
+  const mailboxId = searchParams.get("mailboxId") ?? undefined;
+
+  // Create signed, timestamped, org-bound state
+  const state = createOAuthState(session.orgId, session.userId, mailboxId);
 
   const redirectUri = `${appUrl}/api/auth/google/callback`;
 
@@ -35,15 +47,17 @@ export async function GET(request: NextRequest) {
     scope: SCOPES,
     access_type: "offline",
     prompt: "consent",
-    state: mailboxId ? `${state}:${mailboxId}` : state,
+    state,
   });
 
   const response = NextResponse.redirect(`${GOOGLE_AUTH_URL}?${params.toString()}`);
 
-  // Store state in httpOnly cookie for CSRF validation
-  response.cookies.set(STATE_COOKIE, state, {
+  // Store state nonce in httpOnly cookie for additional CSRF validation
+  const cookieName = getStateCookieName("google");
+  response.cookies.set(cookieName, state, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 600, // 10 minutes
     path: "/",
   });

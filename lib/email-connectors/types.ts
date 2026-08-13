@@ -3,19 +3,27 @@
  * All email provider implementations must conform to the MailboxConnector interface.
  */
 
-import type { Doc } from "../../convex/_generated/dataModel";
-
 // ============================================================
 // Provider Types
 // ============================================================
 
-export type ProviderType = "puzzle" | "mailpool" | "google" | "microsoft";
+export type ProviderType = "smtp" | "puzzle" | "mailpool" | "google" | "microsoft";
 
 // ============================================================
-// Mailbox Record (mirrors convex/schema.ts mailboxes table)
+// Mailbox Record
 // ============================================================
 
-export type MailboxRecord = Doc<"mailboxes">;
+export type MailboxRecord = {
+  id?: string;
+  _id?: string;
+  provider: ProviderType;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  imapHost?: string | null;
+  imapPort?: number | null;
+  username?: string | null;
+  userEmail?: string | null;
+};
 
 // ============================================================
 // Decrypted Credentials
@@ -47,6 +55,7 @@ export interface SendOptions {
   subject: string;
   html: string;
   text: string;
+  headers?: Record<string, string>;
   inReplyTo?: string;
   references?: string[];
 }
@@ -63,6 +72,8 @@ export interface SendResult {
 
 export interface RawMessage {
   messageId: string;
+  providerMessageId?: string;
+  threadId?: string;
   from: string;
   to: string[];
   subject: string;
@@ -71,7 +82,39 @@ export interface RawMessage {
   headers: Record<string, string>;
   inReplyTo?: string;
   references?: string[];
+  snippet?: string;
+  mimeType?: string;
+  partMimeTypes?: string[];
+  attachments?: AttachmentRef[];
+  providerUrl?: string;
   receivedAt: number;
+}
+
+export interface AttachmentRef {
+  id: string;
+  filename: string;
+  size: number;
+  contentType?: string;
+  inline: boolean;
+  contentId?: string;
+}
+
+export interface AttachmentDownload {
+  body: ReadableStream<Uint8Array>;
+  size: number;
+}
+
+// ============================================================
+// Connection Test Result
+// ============================================================
+
+export interface ConnectionTestResult {
+  /** Whether the connection was successful */
+  ok: boolean;
+  /** Error message if connection failed */
+  error?: string;
+  /** Whether the error indicates credentials need to be re-connected */
+  requiresReconnect?: boolean;
 }
 
 // ============================================================
@@ -85,6 +128,15 @@ export interface MailboxConnector {
   /** Poll for new/unread messages */
   pollNewMessages(): Promise<RawMessage[]>;
 
+  /** Mark an inbound message processed after DB side effects succeed */
+  markMessageProcessed?(message: RawMessage): Promise<void>;
+
+  /** Fetch a provider-backed attachment. Unsupported providers omit this capability. */
+  getAttachment?(
+    providerMessageId: string,
+    attachmentId: string
+  ): Promise<AttachmentDownload | null>;
+
   /** Reply to an existing thread */
   replyToThread(threadId: string, html: string): Promise<void>;
 
@@ -93,6 +145,13 @@ export interface MailboxConnector {
    * SMTP/IMAP connectors return an empty string.
    */
   getFreshAccessToken(): Promise<string>;
+
+  /**
+   * Test the connection and credentials.
+   * Returns { ok: true } if the connection is healthy,
+   * or { ok: false, error, requiresReconnect } if it fails.
+   */
+  testConnection(): Promise<ConnectionTestResult>;
 
   /** Clean up connections and resources */
   close(): Promise<void>;

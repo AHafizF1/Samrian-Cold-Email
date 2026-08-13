@@ -1,23 +1,16 @@
-import { ConvexHttpClient } from "convex/browser";
 import { inngest } from "../client";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+import { createWorkerDeps } from "../../src/server/worker";
 
 /**
  * Reset daily sending counters for ALL mailboxes.
  * Triggered by cron at midnight UTC.
  *
- * Uses internalMutation on the Convex side (mutations/mailboxes:resetDailyCounters)
+ * Delegates counter updates to the provider-neutral reset handler.
  * which is a system-level operation with no user/org context.
  */
 export const resetCounters = inngest.createFunction(
   { id: "reset-counters", triggers: [{ cron: "0 0 * * *" }] },
   async ({ step }) => {
-    await step.run("reset-mailbox-counters", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("mutations/mailboxes:resetDailyCounters");
-    });
-
-    return { success: true };
+    return await step.run("reset-mailbox-counters", async () => createWorkerDeps().resetCounters());
   }
 );

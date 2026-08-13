@@ -1,250 +1,135 @@
-# Cold Email Campaign Platform
+# Samrian Cold Email
 
-A modern cold email outreach platform built with Next.js, Convex, and Better Auth.
+Self-hostable cold email platform for campaigns, contacts, mailboxes, inbox replies, durable notifications, and delivery jobs.
 
-## Tech Stack
+## Stack
 
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS
-- **Backend**: Convex (serverless backend)
-- **Auth**: Better Auth with organization support
-- **Language**: TypeScript
+- Next.js 16, React 19, TypeScript, Tailwind CSS
+- PostgreSQL with Drizzle ORM
+- Better Auth with organizations
+- Inngest for managed/serverless jobs
+- BullMQ + Redis for Docker/VPS jobs
+- S3-compatible object storage for AWS S3, Cloudflare R2, Backblaze B2, or MinIO
 
-## Prerequisites
+## Local Setup
 
-- Node.js 20+ or Bun
-- Convex account ([convex.dev](https://convex.dev))
+Install deps:
 
-## Getting Started
-
-### 1. Install Dependencies
-
-```bash
+```powershell
 bun install
-# or
-npm install
 ```
 
-### 2. Set Up Environment Variables
+Copy env:
 
-Copy the example environment file:
-
-```bash
-cp .env.example .env.local
+```powershell
+Copy-Item .env.example .env.local
 ```
 
-Fill in your environment variables:
+Start local infrastructure:
 
-- `CONVEX_DEPLOYMENT` - Your Convex deployment URL
-- `NEXT_PUBLIC_CONVEX_URL` - Your public Convex URL
-- Better Auth configuration variables
-
-### 3. Run Convex Backend
-
-In a separate terminal, start the Convex development server:
-
-```bash
-bunx convex dev
+```powershell
+bun run db:test:up
+bun run queue:test:up
+bun run storage:test:up
 ```
 
-This will:
+Run migrations:
 
-- Start the local Convex backend
-- Watch for schema changes
-- Generate TypeScript types
-
-### 4. Run Next.js Development Server
-
-```bash
-bun dev
-# or
-npm run dev
+```powershell
+bun run db:migrate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your app.
+Start app:
 
-## Project Structure
-
-```
-├── convex/                 # Convex backend
-│   ├── actions/           # External API calls
-│   ├── mutations/         # Database writes
-│   ├── queries/           # Database reads
-│   ├── lib/               # Shared utilities
-│   │   ├── auth.ts       # Auth helpers
-│   │   ├── validators.ts # Validation functions
-│   │   └── spintax.ts    # Email template parser
-│   ├── test/              # Integration tests
-│   └── schema.ts          # Database schema
-├── src/
-│   ├── app/               # Next.js app router
-│   └── components/        # React components
-└── lib/                   # Frontend utilities
+```powershell
+bun run dev
 ```
 
-## Core Features
+Open `http://localhost:3000`.
 
-### Campaign Management
+## Common Commands
 
-- Create and manage email campaigns
-- Schedule sending windows
-- Track campaign status (draft, active, paused, completed)
-
-### Contact Management
-
-- Import contacts (single or bulk)
-- Custom variables for personalization
-- Bounce status tracking
-- Timezone support
-
-### Email Personalization
-
-- Spintax support for variations: `{Hi|Hello|Hey}`
-- Variable replacement: `{{firstName}}`
-- Template preview
-
-## Development
-
-### Running Tests
-
-```bash
-# Run integration tests
-bunx convex run test/integrationTest:runTests
-
-# Run spintax tests
-bunx convex run test/spintaxTest:runTests
-```
-
-### Code Quality
-
-```bash
-# Lint code
+```powershell
+bun run test
+bun run test:db
+bun run type-check
 bun run lint
-
-# Type check
-bunx tsc --noEmit
-
-# Format code (when prettier is set up)
-bun run format
+bun run build
+bun run smoke
+docker compose config
 ```
 
-### Database Schema
+## Architecture
 
-The schema is defined in `convex/schema.ts`. Key tables:
+Runtime code depends on app-owned seams, not provider SDKs:
 
-- `campaigns` - Email campaigns
-- `contacts` - Contact database
-- `campaignContacts` - Campaign-contact assignments
-- `mailboxes` - Email sending accounts
-
-### Authentication
-
-Uses Better Auth with:
-
-- Email/password authentication
-- Organization support
-- Role-based permissions
-- Session management
-
-## API Documentation
-
-### Queries (Read Operations)
-
-**Campaigns**
-
-- `campaigns:list` - List all campaigns for org
-- `campaigns:get` - Get single campaign
-- `campaigns:getByStatus` - Filter by status
-
-**Contacts**
-
-- `contacts:list` - List all contacts
-- `contacts:get` - Get single contact
-- `contacts:search` - Search by email
-
-**Assignments**
-
-- `campaignContacts:listByCampaign` - Get campaign contacts
-- `campaignContacts:getCampaignStats` - Get campaign statistics
-
-### Mutations (Write Operations)
-
-**Campaigns**
-
-- `campaigns:create` - Create new campaign
-- `campaigns:update` - Update campaign details
-- `campaigns:updateStatus` - Change campaign status
-- `campaigns:remove` - Delete campaign (cascades)
-
-**Contacts**
-
-- `contacts:create` - Create single contact
-- `contacts:bulkCreate` - Import multiple contacts
-- `contacts:update` - Update contact
-- `contacts:remove` - Delete contact (cascades)
-
-**Assignments**
-
-- `campaignContacts:assign` - Assign contact to campaign
-- `campaignContacts:bulkAssign` - Assign multiple contacts
-- `campaignContacts:updateStatus` - Update assignment status
-- `campaignContacts:unassign` - Remove assignment
-
-## Environment Variables
-
-Required variables:
-
-```env
-# Convex
-CONVEX_DEPLOYMENT=your-deployment
-NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
-
-# Better Auth
-BETTER_AUTH_SECRET=your-secret-key
-BETTER_AUTH_URL=http://localhost:3000
+```txt
+UI / route handlers / workers
+  -> server modules
+  -> repos / queue / storage / crypto / auth ports
+  -> provider adapters
 ```
 
-## Contributing
+Provider adapters:
 
-1. Create a feature branch from `main`
-2. Make your changes
-3. Run tests and linting
-4. Submit a pull request
+- DB: Drizzle/PostgreSQL under `src/server/db` and `src/server/repos`
+- Auth: Better Auth under `src/server/auth`
+- Jobs: shared handlers under `src/server/jobs`; Inngest and BullMQ adapters call same handlers
+- Storage: `ObjectStore` port with S3-compatible adapter
+- Crypto: versioned, context-bound mailbox credential encryption with rotatable keyring
+
+## Project Layout
+
+```txt
+src/app/          Next.js routes and UI
+src/components/   shared React components
+src/server/auth/  auth config and session/org helpers
+src/server/db/    Drizzle schema, DB client, transactions
+src/server/jobs/  provider-neutral job handlers
+src/server/ports/ app-owned interfaces
+src/server/repos/ Postgres repo adapters
+src/server/queue/ queue provider adapters
+src/server/storage/ object storage adapters
+tests/            unit, contract, repo, API, component, deploy tests
+docs/             current development and deployment docs
+drizzle/          generated migrations
+```
 
 ## Deployment
 
-### Convex
+Docker/VPS mode runs app, Postgres, Redis, worker, and optional MinIO:
 
-```bash
-bunx convex deploy
+```powershell
+docker compose --profile minio up -d --build
+bun run db:migrate
+bun run smoke
 ```
 
-### Next.js (Vercel)
+Managed/serverless mode uses Vercel, managed Postgres, Inngest, and S3/R2-compatible storage. See `docs/DEPLOYMENT.md`.
 
-```bash
-vercel deploy
+## Quality Bar
+
+Before release:
+
+```powershell
+bun run validate
+bun run test
+bun run test:db
+bun run build
+docker compose config
 ```
 
-Or connect your GitHub repo to Vercel for automatic deployments.
-
-## Troubleshooting
-
-### Convex connection issues
-
-- Ensure `bunx convex dev` is running
-- Check your `.env.local` has correct URLs
-- Verify you're logged in: `bunx convex login`
-
-### Type errors
-
-- Regenerate types: `bunx convex dev` (it auto-generates)
-- Check `convex/_generated/` files are present
-
-### Auth issues
-
-- Verify Better Auth environment variables
-- Check organization is set in session
-- Ensure user has required permissions
+Use short domain-first names, keep provider SDKs inside adapter folders, and add tests before changing behavior.
 
 ## License
 
-Private - All rights reserved
+Samrian application and server code are licensed under AGPL-3.0-or-later. Public contracts, SDK,
+CLI, and MCP packages are licensed under MIT. See [LICENSING.md](LICENSING.md) for exact component
+boundaries and [TRADEMARKS.md](TRADEMARKS.md) for brand-use guidance.
+
+## Community
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes.
+- Follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) in project spaces.
+- Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+- Review pending public changes in [CHANGELOG.md](CHANGELOG.md).

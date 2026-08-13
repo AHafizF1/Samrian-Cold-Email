@@ -12,7 +12,6 @@ import { SmtpImapConnector } from "./smtp-imap";
 import { GmailApiConnector } from "./gmail";
 import { MicrosoftGraphConnector } from "./microsoft";
 
-
 /**
  * Returns a MailboxConnector instance for the given mailbox and decrypted credentials.
  *
@@ -25,6 +24,7 @@ export async function getConnector(
   decryptedCreds: DecryptedCredentials
 ): Promise<MailboxConnector> {
   switch (mailbox.provider) {
+    case "smtp":
     case "puzzle":
     case "mailpool": {
       if (decryptedCreds.type !== "smtp-imap") {

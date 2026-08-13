@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -21,6 +21,7 @@
 # production
 /build
 /dist
+**/dist/
 
 # misc
 .DS_Store
@@ -44,9 +45,6 @@ bun-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# convex (keep _generated for TypeScript types)
-.convex/
 
 # IDE
 .vscode/*
@@ -85,4 +83,9 @@ temp/
 
 # Kiro IDE (AI editor) - exclude for open source
 .kiro/
+.claude/
 skills-lock.json
+
+# Security scan output
+/security/reports/*
+!/security/reports/.gitkeep

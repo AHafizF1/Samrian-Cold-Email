@@ -1,0 +1,28 @@
+{
+  "name": "@samrian/mcp",
+  "version": "0.1.0",
+  "description": "Agent-safe MCP server for Samrian",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "samrian-mcp": "./dist/stdio.js"
+  },
+  "exports": {
+    ".": "./dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@samrian/contracts": "workspace:*",
+    "@samrian/sdk": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

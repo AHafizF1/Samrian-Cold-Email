@@ -1,0 +1,55 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: samrian-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - samrian-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    image: oven/bun:1
+    container_name: samrian-app
+    working_dir: /app
+    command: sh -lc "bun install --frozen-lockfile && bun run dev"
+    environment:
+      JOB_PROVIDER: bullmq
+      REDIS_URL: redis://redis:6379
+      DATABASE_DRIVER: postgres-js
+      APP_DATABASE_URL: postgres://samrian_app_runtime:${SAMRIAN_APP_DB_PASSWORD:-samrian-app-local}@host.docker.internal:5432/samrian
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: oven/bun:1
+    container_name: samrian-worker
+    working_dir: /app
+    command: sh -lc "bun install --frozen-lockfile && bun src/server/worker/run.ts"
+    environment:
+      JOB_PROVIDER: bullmq
+      REDIS_URL: redis://redis:6379
+      DATABASE_DRIVER: postgres-js
+      WORKER_DATABASE_URL: postgres://samrian_worker_runtime:${SAMRIAN_WORKER_DB_PASSWORD:-samrian-worker-local}@host.docker.internal:5432/samrian
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      WORKER_CONCURRENCY: "5"
+    volumes:
+      - .:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  samrian-redis-data:

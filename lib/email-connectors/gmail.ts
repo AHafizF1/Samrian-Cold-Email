@@ -2,12 +2,13 @@
  * GmailApiConnector — Google Workspace mailboxes (OAuth2)
  *
  * Send:  Gmail API v1 users.messages.send (thread-aware), fallback to Nodemailer OAuth2
- * Poll:  Gmail API v1 users.messages.list with q:"is:unread", mark as read after fetch
+ * Poll:  Gmail API v1 users.messages.list with q:"is:unread"; caller marks read after DB work.
  */
 
 import nodemailer from "nodemailer";
-import { refreshAccessToken } from "../../convex/lib/oauth";
-import { MailboxConnectionError, TokenRefreshError } from "../../convex/lib/errors";
+import { MailboxConnectionError } from "./errors";
+import { buildMimeHeaders } from "./mime";
+import { refreshAccessToken } from "./oauth";
 import type {
   MailboxConnector,
   MailboxRecord,
@@ -15,9 +16,15 @@ import type {
   SendOptions,
   SendResult,
   RawMessage,
+  ConnectionTestResult,
+  AttachmentDownload,
+  AttachmentRef,
 } from "./types";
+import { deadlineSignal } from "../../src/server/network/deadline";
+import { readJsonResponse } from "../../src/server/http/body";
 
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
+const MAX_MIME_DEPTH = 10;
 
 export class GmailApiConnector implements MailboxConnector {
   /** Cached access token */
@@ -46,10 +53,7 @@ export class GmailApiConnector implements MailboxConnector {
       return this.cachedToken;
     }
 
-    const { accessToken, expiresIn } = await refreshAccessToken(
-      "google",
-      this.creds.refreshToken
-    );
+    const { accessToken, expiresIn } = await refreshAccessToken("google", this.creds.refreshToken);
 
     this.cachedToken = accessToken;
     // Apply 60s buffer so we refresh before actual expiry
@@ -81,6 +85,7 @@ export class GmailApiConnector implements MailboxConnector {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: deadlineSignal(),
     });
 
     if (response.status === 403 || response.status === 404) {
@@ -96,9 +101,7 @@ export class GmailApiConnector implements MailboxConnector {
       );
     }
 
-    const data = (await response.json()) as { id: string; threadId: string };
-    const fromEmail = this.mailbox.userEmail ?? message.from;
-
+    const data = await readJsonResponse<{ id: string; threadId: string }>(response, 64 * 1024);
     return {
       messageId: `<${data.id}@mail.gmail.com>`,
       accepted: [message.to],
@@ -112,50 +115,92 @@ export class GmailApiConnector implements MailboxConnector {
     const token = await this.getFreshAccessToken();
 
     // List unread messages
-    const listResp = await fetch(
-      `${GMAIL_API_BASE}/messages?q=is%3Aunread&maxResults=50`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const listResp = await fetch(`${GMAIL_API_BASE}/messages?q=is%3Aunread&maxResults=50`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: deadlineSignal(),
+    });
 
     if (!listResp.ok) {
-      throw new MailboxConnectionError(
-        `Gmail API list failed (${listResp.status})`,
-        "google"
-      );
+      throw new MailboxConnectionError(`Gmail API list failed (${listResp.status})`, "google");
     }
 
-    const listData = (await listResp.json()) as {
+    const listData = await readJsonResponse<{
       messages?: Array<{ id: string; threadId: string }>;
-    };
+    }>(listResp, 1024 * 1024);
 
     if (!listData.messages?.length) return [];
 
     const messages: RawMessage[] = [];
 
     for (const { id } of listData.messages) {
-      const msgResp = await fetch(
-        `${GMAIL_API_BASE}/messages/${id}?format=full`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const msgResp = await fetch(`${GMAIL_API_BASE}/messages/${id}?format=full`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: deadlineSignal(),
+      });
 
       if (!msgResp.ok) continue;
 
-      const gmailMsg = (await msgResp.json()) as GmailMessage;
+      const gmailMsg = await readJsonResponse<GmailMessage>(msgResp, 2 * 1024 * 1024).catch(
+        () => null
+      );
+      if (!gmailMsg) continue;
       const parsed = parseGmailMessage(gmailMsg);
       if (parsed) messages.push(parsed);
-
-      // Mark as read
-      await fetch(`${GMAIL_API_BASE}/messages/${id}/modify`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ removeLabelIds: ["UNREAD"] }),
-      });
     }
 
     return messages;
+  }
+
+  async markMessageProcessed(message: RawMessage): Promise<void> {
+    const id = message.providerMessageId;
+    if (!id) return;
+
+    const token = await this.getFreshAccessToken();
+    await fetch(`${GMAIL_API_BASE}/messages/${id}/modify`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ removeLabelIds: ["UNREAD"] }),
+      signal: deadlineSignal(),
+    });
+  }
+
+  async getAttachment(
+    providerMessageId: string,
+    attachmentId: string
+  ): Promise<AttachmentDownload | null> {
+    const token = await this.getFreshAccessToken();
+    const response = await fetch(
+      `${GMAIL_API_BASE}/messages/${encodeURIComponent(providerMessageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: deadlineSignal(),
+      }
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new MailboxConnectionError(
+        `Gmail attachment fetch failed (${response.status})`,
+        "google"
+      );
+    }
+    const data = await readJsonResponse<{ data?: string; size?: number }>(
+      response,
+      6 * 1024 * 1024
+    );
+    if (!data.data) return null;
+    const bytes = base64urlDecodeBytes(data.data);
+    return {
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      }),
+      size: data.size ?? bytes.byteLength,
+    };
   }
 
   // ── Reply ───────────────────────────────────────────────────────────────────
@@ -185,6 +230,7 @@ export class GmailApiConnector implements MailboxConnector {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ raw: encoded, threadId }),
+      signal: deadlineSignal(),
     });
 
     if (!response.ok) {
@@ -196,6 +242,47 @@ export class GmailApiConnector implements MailboxConnector {
     }
   }
 
+  // ── Test Connection ─────────────────────────────────────────────────────────
+
+  async testConnection(): Promise<ConnectionTestResult> {
+    try {
+      const token = await this.getFreshAccessToken();
+      const response = await fetch(`${GMAIL_API_BASE}/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: deadlineSignal(),
+      });
+
+      if (response.ok) {
+        return { ok: true };
+      }
+
+      const errorBody = await readJsonResponse<{ error?: { message?: string } }>(
+        response,
+        64 * 1024
+      ).catch((): { error?: { message?: string } } => ({}));
+      const errorMsg = errorBody?.error?.message ?? `HTTP ${response.status}`;
+
+      // Detect revoked/expired tokens
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false,
+          error: errorMsg,
+          requiresReconnect: true,
+        };
+      }
+
+      return { ok: false, error: errorMsg };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const isAuthError = message.includes("invalid_grant") || message.includes("Token has been");
+      return {
+        ok: false,
+        error: message,
+        requiresReconnect: isAuthError,
+      };
+    }
+  }
+
   // ── Close (no-op) ────────────────────────────────────────────────────────────
 
   async close(): Promise<void> {
@@ -204,10 +291,7 @@ export class GmailApiConnector implements MailboxConnector {
 
   // ── Private: Nodemailer fallback ─────────────────────────────────────────────
 
-  private async sendViaNodemailer(
-    message: SendOptions,
-    accessToken: string
-  ): Promise<SendResult> {
+  private async sendViaNodemailer(message: SendOptions, accessToken: string): Promise<SendResult> {
     const from = this.mailbox.userEmail ?? message.from;
 
     const transport = nodemailer.createTransport({
@@ -225,6 +309,7 @@ export class GmailApiConnector implements MailboxConnector {
       subject: message.subject,
       html: message.html,
       text: message.text,
+      headers: message.headers,
       ...(message.inReplyTo && { inReplyTo: message.inReplyTo }),
       ...(message.references?.length && {
         references: message.references.join(" "),
@@ -245,21 +330,7 @@ export class GmailApiConnector implements MailboxConnector {
  * Build an RFC 2822 email message string.
  */
 function buildRfc2822Message(message: SendOptions): string {
-  const lines: string[] = [
-    `From: ${message.from}`,
-    `To: ${message.to}`,
-    `Subject: ${message.subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/html; charset=UTF-8`,
-  ];
-
-  if (message.inReplyTo) {
-    lines.push(`In-Reply-To: ${message.inReplyTo}`);
-  }
-  if (message.references?.length) {
-    lines.push(`References: ${message.references.join(" ")}`);
-  }
-
+  const lines = buildMimeHeaders(message);
   lines.push("", message.html);
   return lines.join("\r\n");
 }
@@ -280,9 +351,10 @@ function base64urlEncode(input: string): string {
 
 interface GmailMessagePart {
   partId?: string;
+  filename?: string;
   mimeType?: string;
   headers?: Array<{ name: string; value: string }>;
-  body?: { data?: string; size?: number };
+  body?: { attachmentId?: string; data?: string; size?: number };
   parts?: GmailMessagePart[];
 }
 
@@ -315,18 +387,17 @@ function parseGmailMessage(msg: GmailMessage): RawMessage | null {
   const subject = headers["subject"] ?? "";
   const inReplyTo = headers["in-reply-to"];
   const referencesRaw = headers["references"];
-  const references = referencesRaw
-    ? referencesRaw.split(/\s+/).filter(Boolean)
-    : undefined;
+  const references = referencesRaw ? referencesRaw.split(/\s+/).filter(Boolean) : undefined;
 
-  const receivedAt = msg.internalDate
-    ? parseInt(msg.internalDate, 10)
-    : Date.now();
+  const receivedAt = msg.internalDate ? parseInt(msg.internalDate, 10) : Date.now();
 
   const { textBody, htmlBody } = extractBodies(payload);
+  const attachments = collectAttachments(payload);
 
   return {
     messageId,
+    providerMessageId: msg.id,
+    threadId: msg.threadId,
     from,
     to,
     subject,
@@ -335,14 +406,54 @@ function parseGmailMessage(msg: GmailMessage): RawMessage | null {
     headers,
     inReplyTo,
     references,
+    mimeType: payload.mimeType,
+    partMimeTypes: collectMimeTypes(payload),
+    attachments,
+    providerUrl: `https://mail.google.com/mail/u/0/#inbox/${encodeURIComponent(msg.threadId)}`,
     receivedAt,
   };
+}
+
+function collectMimeTypes(part: GmailMessagePart, depth = 0): string[] {
+  return [
+    ...(part.mimeType ? [part.mimeType] : []),
+    ...(depth < MAX_MIME_DEPTH
+      ? (part.parts ?? []).flatMap((child) => collectMimeTypes(child, depth + 1))
+      : []),
+  ];
+}
+
+function collectAttachments(part: GmailMessagePart, depth = 0): AttachmentRef[] {
+  const disposition =
+    part.headers?.find((header) => header.name.toLowerCase() === "content-disposition")?.value ??
+    "";
+  const current =
+    part.body?.attachmentId && part.filename
+      ? [
+          {
+            id: part.body.attachmentId,
+            filename: part.filename,
+            size: part.body.size ?? 0,
+            contentType: part.mimeType,
+            inline: disposition.toLowerCase().startsWith("inline"),
+          },
+        ]
+      : [];
+  return [
+    ...current,
+    ...(depth < MAX_MIME_DEPTH
+      ? (part.parts ?? []).flatMap((child) => collectAttachments(child, depth + 1))
+      : []),
+  ];
 }
 
 /**
  * Recursively extract text and HTML bodies from a Gmail message part.
  */
-function extractBodies(part: GmailMessagePart): {
+function extractBodies(
+  part: GmailMessagePart,
+  depth = 0
+): {
   textBody?: string;
   htmlBody?: string;
 } {
@@ -356,8 +467,9 @@ function extractBodies(part: GmailMessagePart): {
   let textBody: string | undefined;
   let htmlBody: string | undefined;
 
+  if (depth >= MAX_MIME_DEPTH) return {};
   for (const child of part.parts ?? []) {
-    const result = extractBodies(child);
+    const result = extractBodies(child, depth + 1);
     if (result.textBody) textBody = result.textBody;
     if (result.htmlBody) htmlBody = result.htmlBody;
   }
@@ -372,4 +484,9 @@ function base64urlDecode(input: string): string {
   const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
   return atob(padded);
+}
+
+function base64urlDecodeBytes(input: string): Uint8Array {
+  const binary = base64urlDecode(input);
+  return Uint8Array.from(binary, (value) => value.charCodeAt(0));
 }

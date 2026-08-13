@@ -1,0 +1,44 @@
+services:
+  dev-app:
+    image: oven/bun:1.3.2
+    container_name: samrian-inngest-app
+    working_dir: /app
+    command: sh -c "bun install --frozen-lockfile --linker hoisted && bun run dev"
+    env_file:
+      - path: .env.local
+        required: true
+    environment:
+      DATABASE_URL: ""
+      DATABASE_POOL_URL: ""
+      APP_DATABASE_URL: postgres://samrian_app_runtime:${SAMRIAN_APP_DB_PASSWORD:-samrian-app-local}@postgres:5432/samrian
+      AUTH_DATABASE_URL: postgres://samrian_auth_runtime:${SAMRIAN_AUTH_DB_PASSWORD:-samrian-auth-local}@postgres:5432/samrian
+      WORKER_DATABASE_URL: postgres://samrian_worker_runtime:${SAMRIAN_WORKER_DB_PASSWORD:-samrian-worker-local}@postgres:5432/samrian
+      INNGEST_DEV: "1"
+      INNGEST_BASE_URL: http://inngest:8288
+      JOB_PROVIDER: inngest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - samrian-inngest-node-modules:/app/node_modules
+      - samrian-inngest-next:/app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  inngest:
+    image: inngest/inngest:v1.22.0
+    container_name: samrian-inngest
+    command:
+      - inngest
+      - dev
+      - --no-discovery
+      - -u
+      - http://dev-app:3000/api/inngest
+    ports:
+      - "8288:8288"
+      - "8289:8289"
+
+volumes:
+  samrian-inngest-node-modules:
+  samrian-inngest-next:

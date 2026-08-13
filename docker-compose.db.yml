@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: samrian-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: samrian
+      SAMRIAN_APP_DB_PASSWORD: ${SAMRIAN_APP_DB_PASSWORD:-samrian-app-local}
+      SAMRIAN_AUTH_DB_PASSWORD: ${SAMRIAN_AUTH_DB_PASSWORD:-samrian-auth-local}
+      SAMRIAN_WORKER_DB_PASSWORD: ${SAMRIAN_WORKER_DB_PASSWORD:-samrian-worker-local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - samrian-postgres-data:/var/lib/postgresql/data
+      - ./scripts/db/init-roles.sh:/docker-entrypoint-initdb.d/001-init-roles.sh:ro
+      - ./scripts/db/init-test-db.sql:/docker-entrypoint-initdb.d/002-init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d samrian"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  samrian-postgres-data:

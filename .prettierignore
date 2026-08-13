@@ -8,9 +8,10 @@ node_modules/
 out/
 build/
 dist/
+**/dist/
 
 # Generated files
-convex/_generated/
+drizzle/meta/*.json
 *.tsbuildinfo
 
 # Logs
@@ -22,9 +23,6 @@ convex/_generated/
 # IDE
 .vscode/
 .idea/
-
-# Convex
-.convex/
 
 # Misc
 coverage/

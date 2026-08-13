@@ -2,13 +2,14 @@
  * MicrosoftGraphConnector — Microsoft 365 mailboxes (OAuth2)
  *
  * Send:  Graph API POST /me/sendMail (max 4 concurrent requests per mailbox)
- * Poll:  Graph API GET /me/messages?$filter=isRead eq false, mark as read after fetch
+ * Poll:  Graph API GET /me/messages?$filter=isRead eq false; caller marks read after DB work.
  * Reply: Graph API POST /me/messages/{id}/reply
  * 429:   Parse Retry-After header, exponential backoff (up to 3 retries)
  */
 
-import { refreshAccessToken } from "../../convex/lib/oauth";
-import { MailboxConnectionError } from "../../convex/lib/errors";
+import { MailboxConnectionError } from "./errors";
+import { refreshAccessToken } from "./oauth";
+import { buildMimeHeaders } from "./mime";
 import type {
   MailboxConnector,
   MailboxRecord,
@@ -16,7 +17,11 @@ import type {
   SendOptions,
   SendResult,
   RawMessage,
+  ConnectionTestResult,
+  AttachmentDownload,
 } from "./types";
+import { deadlineSignal } from "../../src/server/network/deadline";
+import { readJsonResponse } from "../../src/server/http/body";
 
 const GRAPH_API_BASE = "https://graph.microsoft.com/v1.0/me";
 const MAX_CONCURRENT = 4;
@@ -71,6 +76,10 @@ export class MicrosoftGraphConnector implements MailboxConnector {
   async send(message: SendOptions): Promise<SendResult> {
     const token = await this.getFreshAccessToken();
 
+    if (hasStandardHeaders(message)) {
+      return this.sendMime(message, token);
+    }
+
     const body = {
       message: {
         subject: message.subject,
@@ -117,6 +126,23 @@ export class MicrosoftGraphConnector implements MailboxConnector {
     };
   }
 
+  private async sendMime(message: SendOptions, token: string): Promise<SendResult> {
+    await this.fetchWithThrottle(`${GRAPH_API_BASE}/sendMail`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "text/plain",
+      },
+      body: base64Encode(buildMimeMessage(message)),
+    });
+
+    return {
+      messageId: `<${Date.now()}.${Math.random().toString(36).slice(2)}@graph.microsoft.com>`,
+      accepted: [message.to],
+      rejected: [],
+    };
+  }
+
   // ── Poll ────────────────────────────────────────────────────────────────────
 
   async pollNewMessages(): Promise<RawMessage[]> {
@@ -126,15 +152,16 @@ export class MicrosoftGraphConnector implements MailboxConnector {
       `${GRAPH_API_BASE}/messages` +
       `?$filter=isRead eq false` +
       `&$top=50` +
-      `&$select=id,subject,from,toRecipients,body,receivedDateTime,internetMessageId,internetMessageHeaders`;
+      `&$select=id,conversationId,subject,from,toRecipients,body,receivedDateTime,internetMessageId,internetMessageHeaders,webLink` +
+      `&$expand=attachments($select=id,name,contentType,size,isInline)`;
 
     const response = await this.fetchWithThrottle(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = (await response.json()) as {
+    const data = await readJsonResponse<{
       value?: GraphMessage[];
-    };
+    }>(response, 5 * 1024 * 1024);
 
     if (!data.value?.length) return [];
 
@@ -143,19 +170,40 @@ export class MicrosoftGraphConnector implements MailboxConnector {
     for (const msg of data.value) {
       const parsed = parseGraphMessage(msg);
       if (parsed) messages.push(parsed);
-
-      // Mark as read
-      await this.fetchWithThrottle(`${GRAPH_API_BASE}/messages/${msg.id}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ isRead: true }),
-      });
     }
 
     return messages;
+  }
+
+  async markMessageProcessed(message: RawMessage): Promise<void> {
+    const id = message.providerMessageId;
+    if (!id) return;
+
+    const token = await this.getFreshAccessToken();
+    await this.fetchWithThrottle(`${GRAPH_API_BASE}/messages/${id}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ isRead: true }),
+    });
+  }
+
+  async getAttachment(
+    providerMessageId: string,
+    attachmentId: string
+  ): Promise<AttachmentDownload | null> {
+    const token = await this.getFreshAccessToken();
+    const response = await this.fetchWithThrottle(
+      `${GRAPH_API_BASE}/messages/${encodeURIComponent(providerMessageId)}/attachments/${encodeURIComponent(attachmentId)}/$value`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!response.body) return null;
+    return {
+      body: response.body,
+      size: Number(response.headers.get("Content-Length") ?? 0),
+    };
   }
 
   // ── Reply ───────────────────────────────────────────────────────────────────
@@ -163,24 +211,61 @@ export class MicrosoftGraphConnector implements MailboxConnector {
   async replyToThread(threadId: string, html: string): Promise<void> {
     const token = await this.getFreshAccessToken();
 
-    await this.fetchWithThrottle(
-      `${GRAPH_API_BASE}/messages/${threadId}/reply`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: {
-            body: {
-              contentType: "HTML",
-              content: html,
-            },
+    await this.fetchWithThrottle(`${GRAPH_API_BASE}/messages/${threadId}/reply`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          body: {
+            contentType: "HTML",
+            content: html,
           },
-        }),
+        },
+      }),
+    });
+  }
+
+  // ── Test Connection ─────────────────────────────────────────────────────────
+
+  async testConnection(): Promise<ConnectionTestResult> {
+    try {
+      const token = await this.getFreshAccessToken();
+      const response = await fetch(`${GRAPH_API_BASE}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: deadlineSignal(),
+      });
+
+      if (response.ok) {
+        return { ok: true };
       }
-    );
+
+      const errorBody = await readJsonResponse<{ error?: { message?: string } }>(
+        response,
+        64 * 1024
+      ).catch((): { error?: { message?: string } } => ({}));
+      const errorMsg = errorBody?.error?.message ?? `HTTP ${response.status}`;
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false,
+          error: errorMsg,
+          requiresReconnect: true,
+        };
+      }
+
+      return { ok: false, error: errorMsg };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const isAuthError = message.includes("invalid_grant") || message.includes("AADSTS");
+      return {
+        ok: false,
+        error: message,
+        requiresReconnect: isAuthError,
+      };
+    }
   }
 
   // ── Close (no-op) ────────────────────────────────────────────────────────────
@@ -223,10 +308,7 @@ export class MicrosoftGraphConnector implements MailboxConnector {
    * - Concurrency limit (MAX_CONCURRENT slots)
    * - 429 retry with Retry-After + exponential backoff (up to MAX_RETRIES)
    */
-  private async fetchWithThrottle(
-    url: string,
-    init: RequestInit
-  ): Promise<Response> {
+  private async fetchWithThrottle(url: string, init: RequestInit): Promise<Response> {
     await this.acquireSlot();
 
     try {
@@ -236,18 +318,15 @@ export class MicrosoftGraphConnector implements MailboxConnector {
     }
   }
 
-  private async fetchWithRetry(
-    url: string,
-    init: RequestInit,
-    attempt: number
-  ): Promise<Response> {
-    const response = await fetch(url, init);
+  private async fetchWithRetry(url: string, init: RequestInit, attempt: number): Promise<Response> {
+    const response = await fetch(url, {
+      ...init,
+      signal: deadlineSignal(init.signal ?? undefined),
+    });
 
     if (response.status === 429 && attempt < MAX_RETRIES) {
       const retryAfterHeader = response.headers.get("Retry-After");
-      const retryAfterSeconds = retryAfterHeader
-        ? parseInt(retryAfterHeader, 10)
-        : 0;
+      const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 0;
 
       // Exponential backoff: max(Retry-After, 2^attempt) seconds
       const backoffSeconds = Math.max(
@@ -277,6 +356,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function hasStandardHeaders(message: SendOptions) {
+  return Boolean(
+    message.headers?.["List-Unsubscribe"] || message.headers?.["List-Unsubscribe-Post"]
+  );
+}
+
+function buildMimeMessage(message: SendOptions) {
+  const lines = buildMimeHeaders(message);
+  lines.push("", message.html);
+  return lines.join("\r\n");
+}
+
+function base64Encode(input: string) {
+  return Buffer.from(input, "utf8").toString("base64");
+}
+
 // ── Graph API types ───────────────────────────────────────────────────────────
 
 interface GraphEmailAddress {
@@ -295,6 +390,7 @@ interface GraphInternetMessageHeader {
 
 interface GraphMessage {
   id: string;
+  conversationId?: string;
   subject?: string;
   from?: GraphRecipient;
   toRecipients?: GraphRecipient[];
@@ -302,6 +398,14 @@ interface GraphMessage {
   receivedDateTime?: string;
   internetMessageId?: string;
   internetMessageHeaders?: GraphInternetMessageHeader[];
+  webLink?: string;
+  attachments?: Array<{
+    id: string;
+    name?: string;
+    contentType?: string;
+    size?: number;
+    isInline?: boolean;
+  }>;
 }
 
 /**
@@ -321,21 +425,18 @@ function parseGraphMessage(msg: GraphMessage): RawMessage | null {
 
   const inReplyTo = headers["in-reply-to"];
   const referencesRaw = headers["references"];
-  const references = referencesRaw
-    ? referencesRaw.split(/\s+/).filter(Boolean)
-    : undefined;
+  const references = referencesRaw ? referencesRaw.split(/\s+/).filter(Boolean) : undefined;
 
-  const receivedAt = msg.receivedDateTime
-    ? new Date(msg.receivedDateTime).getTime()
-    : Date.now();
+  const receivedAt = msg.receivedDateTime ? new Date(msg.receivedDateTime).getTime() : Date.now();
 
-  const isHtml =
-    msg.body?.contentType?.toLowerCase() === "html";
+  const isHtml = msg.body?.contentType?.toLowerCase() === "html";
   const htmlBody = isHtml ? msg.body?.content : undefined;
   const textBody = !isHtml ? msg.body?.content : undefined;
 
   return {
     messageId,
+    providerMessageId: msg.id,
+    threadId: msg.conversationId,
     from,
     to,
     subject,
@@ -344,6 +445,17 @@ function parseGraphMessage(msg: GraphMessage): RawMessage | null {
     headers,
     inReplyTo,
     references,
+    mimeType: msg.body?.contentType,
+    attachments: (msg.attachments ?? [])
+      .filter((attachment) => Boolean(attachment.id && attachment.name))
+      .map((attachment) => ({
+        id: attachment.id,
+        filename: attachment.name!,
+        size: attachment.size ?? 0,
+        contentType: attachment.contentType,
+        inline: attachment.isInline ?? false,
+      })),
+    providerUrl: msg.webLink,
     receivedAt,
   };
 }

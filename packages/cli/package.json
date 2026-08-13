@@ -1,0 +1,21 @@
+{
+  "name": "@samrian/cli",
+  "version": "0.1.0",
+  "description": "Human and automation CLI for Samrian",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "samrian": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@samrian/sdk": "workspace:*",
+    "commander": "^14.0.3"
+  }
+}

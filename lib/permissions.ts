@@ -12,6 +12,13 @@ const statement = {
   mailbox: ["create", "read", "update", "delete"],
   campaign: ["create", "read", "update", "delete", "launch", "pause"],
   contact: ["create", "read", "update", "delete", "import"],
+  credential: ["create", "read", "delete"],
+  group: ["create", "read", "update", "delete"],
+  blocklist: ["create", "read", "delete"],
+  inbox: ["read", "update", "reply"],
+  analytics: ["read", "export"],
+  domain: ["read", "check"],
+  notification: ["read", "update"],
   settings: ["read", "update"],
 } as const;
 
@@ -22,6 +29,13 @@ export const owner = ac.newRole({
   mailbox: ["create", "read", "update", "delete"],
   campaign: ["create", "read", "update", "delete", "launch", "pause"],
   contact: ["create", "read", "update", "delete", "import"],
+  credential: ["create", "read", "delete"],
+  group: ["create", "read", "update", "delete"],
+  blocklist: ["create", "read", "delete"],
+  inbox: ["read", "update", "reply"],
+  analytics: ["read", "export"],
+  domain: ["read", "check"],
+  notification: ["read", "update"],
   settings: ["read", "update"],
 });
 
@@ -30,6 +44,13 @@ export const admin = ac.newRole({
   mailbox: ["create", "read", "update", "delete"],
   campaign: ["create", "read", "update", "delete", "launch", "pause"],
   contact: ["create", "read", "update", "delete", "import"],
+  credential: ["create", "read", "delete"],
+  group: ["create", "read", "update", "delete"],
+  blocklist: ["create", "read", "delete"],
+  inbox: ["read", "update", "reply"],
+  analytics: ["read", "export"],
+  domain: ["read", "check"],
+  notification: ["read", "update"],
   settings: ["read"],
 });
 
@@ -38,5 +59,13 @@ export const member = ac.newRole({
   mailbox: ["read"],
   campaign: ["create", "read", "update", "launch", "pause"],
   contact: ["read"],
+  group: ["read"],
+  blocklist: ["read"],
+  inbox: ["read", "update", "reply"],
+  analytics: ["read"],
+  domain: ["read"],
+  notification: ["read", "update"],
   settings: ["read"],
 });
+
+export const permissionCatalog = statement;

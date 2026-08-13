@@ -1,239 +1,121 @@
-# Development Guide
+# Development
 
-Quick reference for common development tasks.
+Use this as current development reference.
 
-## Daily Development
+## Start Local App
 
-### Starting Development
-
-```bash
-# Terminal 1: Start Convex backend
-bunx convex dev
-
-# Terminal 2: Start Next.js
-bun dev
+```powershell
+bun install
+Copy-Item .env.example .env.local
+bun run db:test:up
+bun run queue:test:up
+bun run storage:test:up
+bun run db:migrate
+bun run dev
 ```
 
-### Code Quality
+Optional worker process:
 
-```bash
-# Format all files
-bun run format
+```powershell
+bun run worker
+```
 
-# Check formatting without changes
-bun run format:check
+## Quality Commands
 
-# Lint code
-bun run lint
-
-# Type check
+```powershell
+bun run test
+bun run test:db
 bun run type-check
-
-# Run all checks
+bun run lint
+bun run format:check
+bun run build
 bun run validate
 ```
 
-## Testing
-
-### Run All Tests
-
-```bash
-bun test
-```
-
-### Run Specific Tests
-
-```bash
-# Integration tests
-bunx convex run test/integrationTest:runTests
-
-# Spintax tests
-bunx convex run test/spintaxTest:runTests
-```
+`bun run validate` runs type-check, lint, and format check.
 
 ## Database
 
-### View Data
+Schema lives under `src/server/db/schema`.
 
-Use Convex Dashboard: https://dashboard.convex.dev
+`DATABASE_URL` is migration-only. App and worker runtime use non-owner `APP_DATABASE_URL` and `WORKER_DATABASE_URL`. See `docs/RLS.md`.
 
-### Schema Changes
-
-1. Edit `convex/schema.ts`
-2. Convex dev server auto-detects changes
-3. Types regenerate automatically in `convex/_generated/`
-
-### Migrations
-
-For breaking schema changes, see `docs/MIGRATIONS.md` (when needed)
-
-## Common Tasks
-
-### Add New Query
-
-```typescript
-// convex/queries/resource.ts
-import { query } from "../_generated/server";
-import { v } from "convex/values";
-import { requireOrgAccess } from "../lib/auth";
-
-export const list = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      /* ... */
-    })
-  ),
-  handler: async (ctx) => {
-    const { orgId } = await requireOrgAccess(ctx, { resource: ["read"] });
-
-    return await ctx.db
-      .query("resources")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-  },
-});
+```powershell
+bun run db:generate
+bun run db:migrate
+bun run db:push
+bun run db:studio
 ```
 
-### Add New Mutation
+Use generated migrations for production. Use push only for local iteration.
 
-```typescript
-// convex/mutations/resource.ts
-import { mutation } from "../_generated/server";
-import { v } from "convex/values";
-import { requireOrgAccess, verifyOrgOwnership } from "../lib/auth";
+## Architecture Rules
 
-export const update = mutation({
-  args: {
-    id: v.id("resources"),
-    name: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const { orgId } = await requireOrgAccess(ctx, { resource: ["update"] });
+- UI, routes, and workers call server modules or app-owned ports.
+- Drizzle imports stay inside `src/server/db`, `src/server/repos`, and tests.
+- Queue provider imports stay inside `src/server/queue`, `src/server/worker`, and tests.
+- Storage provider imports stay inside `src/server/storage` and tests.
+- Auth/session/org checks live in `src/server/auth` or server modules, not repo adapters.
+- Auth provider SDK imports stay inside `src/server/auth` adapters and auth route/proxy glue.
+- Client code uses `src/lib/auth`, not provider SDK clients directly.
+- Repo adapters expose domain behavior, not table-string CRUD.
+- Raw SQL belongs only in migrations or test setup unless a repo test proves need.
 
-    const resource = await ctx.db.get(args.id);
-    await verifyOrgOwnership(resource, orgId, "Resource");
+## Adding Data Behavior
 
-    await ctx.db.patch(args.id, { name: args.name });
-    return null;
-  },
-});
-```
+1. Write failing repo/module test.
+2. Add or extend port only when missing behavior is proven.
+3. Implement repo method behind Drizzle adapter.
+4. Keep auth/org checks in module or route layer.
+5. Run focused test, then full verification.
 
-### Add Validation
+## Adding Job Behavior
 
-```typescript
-// convex/lib/validators.ts
-export const RESOURCE_STATUSES = ["active", "inactive"] as const;
-export type ResourceStatus = (typeof RESOURCE_STATUSES)[number];
+1. Write failing handler test under `tests/unit/jobs`.
+2. Put business flow in `src/server/jobs`.
+3. Keep runtime mapping in Inngest or BullMQ adapter only.
+4. Make handler idempotent under retries.
+5. Run queue/worker tests when payload or retry behavior changes.
 
-export function isValidResourceStatus(status: string): status is ResourceStatus {
-  return RESOURCE_STATUSES.includes(status as ResourceStatus);
-}
-```
+## Naming
 
-## Debugging
-
-### Convex Logs
-
-```bash
-# View logs in terminal
-bunx convex dev
-
-# Or in dashboard
-https://dashboard.convex.dev
-```
-
-### Console Logging
-
-```typescript
-// In Convex functions
-console.log("Debug:", value);
-console.error("Error:", error);
-```
-
-### TypeScript Errors
-
-```bash
-# Check types
-bun run type-check
-
-# Regenerate Convex types
-bunx convex dev
-```
-
-## Deployment
-
-### Deploy Convex
-
-```bash
-bunx convex deploy --prod
-```
-
-### Deploy Next.js
-
-```bash
-# Vercel
-vercel deploy --prod
-
-# Or push to main branch (if auto-deploy configured)
-git push origin main
-```
-
-## Troubleshooting
-
-### "Module not found" errors
-
-```bash
-bun install
-bunx convex dev  # Regenerate types
-```
-
-### Auth not working
-
-- Check `.env.local` has all required variables
-- Verify Better Auth configuration
-- Check user has active organization
-
-### Database query issues
-
-- Check indexes in `convex/schema.ts`
-- Verify orgId filtering
-- Use Convex dashboard to inspect data
-
-### Type errors after schema change
-
-```bash
-bunx convex dev  # Regenerates types
-```
-
-## Performance Tips
-
-### Query Optimization
-
-- Use indexes for filtering
-- Limit results with `.take(n)`
-- Paginate large datasets
-
-### Mutation Optimization
-
-- Batch operations when possible
-- Use `bulkCreate` / `bulkAssign` for multiple items
-- Avoid N+1 queries
+- Use short, searchable file names.
+- Prefer folder context: `jobs/send.ts`, `queue/bullmq.ts`, `storage/s3.ts`.
+- Avoid vague names: `utils`, `helpers`, `manager`, `service`.
+- Tests use `*.test.ts`; reusable port tests use `*.contract.test.ts`.
 
 ## Security Checklist
 
-- [ ] All mutations check `requireOrgAccess()`
-- [ ] Resources verified with `verifyOrgOwnership()`
-- [ ] Input validated before database operations
-- [ ] Sensitive data not logged
-- [ ] Permissions checked for each operation
+- Auth required before org data access.
+- Org ownership checked before reads/writes.
+- Secrets encrypted server-side only.
+- No secrets in logs, health responses, or docs examples.
+- User-facing errors do not leak other org resource existence.
 
-## Resources
+## References
 
-- [Convex Docs](https://docs.convex.dev)
-- [Next.js Docs](https://nextjs.org/docs)
-- [Better Auth Docs](https://better-auth.com)
-- [Project README](../README.md)
-- [Contributing Guide](../CONTRIBUTING.md)
+- `README.md`
+- `docs/DEPLOYMENT.md`
+- `CONTRIBUTING.md`
+
+## Mailbox Ramp
+
+Mailbox Ramp limits real campaign sends while a new or recovering mailbox builds stable sending
+history. It does not send synthetic warmup messages, create fake replies, or guarantee inbox
+placement.
+
+Effective campaign capacity uses the lowest provider, user, and ramp limit. Sent messages,
+follow-ups, queued reservations, and manual-reply reserve share that budget. Dispatcher reserves
+capacity before enqueue; send worker rechecks before provider delivery.
+
+Operators configure org defaults under **Settings > Sending** and control each mailbox from the
+mailbox table. Daily evaluation can advance, hold, reduce, pause, or recover a mailbox from recent
+delivery evidence. Calendar age only makes a mailbox eligible for evaluation; it never forces an
+increase.
+
+Useful checks:
+
+```powershell
+bun run test --project unit -- tests/unit/modules/ramp.test.ts tests/unit/jobs/ramp.test.ts
+bun run test --project components -- tests/components/ramp.test.tsx
+```
