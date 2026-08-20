@@ -1,19 +1,4 @@
 CREATE TYPE "public"."blocklist_reason" AS ENUM('unsubscribed', 'bounced_hard', 'manual');--> statement-breakpoint
-DO $$ BEGIN
-  CREATE ROLE samrian_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-EXCEPTION WHEN duplicate_object THEN
-  ALTER ROLE samrian_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-END $$;--> statement-breakpoint
-DO $$ BEGIN
-  CREATE ROLE samrian_auth NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-EXCEPTION WHEN duplicate_object THEN
-  ALTER ROLE samrian_auth NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-END $$;--> statement-breakpoint
-DO $$ BEGIN
-  CREATE ROLE samrian_worker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-EXCEPTION WHEN duplicate_object THEN
-  ALTER ROLE samrian_worker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-END $$;--> statement-breakpoint
 CREATE TYPE "public"."assignment_status" AS ENUM('active', 'replied', 'bounced', 'unsubscribed', 'completed');--> statement-breakpoint
 CREATE TYPE "public"."campaign_status" AS ENUM('draft', 'active', 'paused', 'completed');--> statement-breakpoint
 CREATE TYPE "public"."group_logic" AS ENUM('AND', 'OR');--> statement-breakpoint
@@ -385,6 +370,17 @@ CREATE TABLE "mailboxes" (
 );
 --> statement-breakpoint
 ALTER TABLE "mailboxes" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "send_reservations" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"mailbox_id" text NOT NULL,
+	"assignment_id" text NOT NULL,
+	"step_number" integer NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "send_reservations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "notification_prefs" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text NOT NULL,
@@ -429,6 +425,15 @@ CREATE TABLE "members" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "organization_roles" (
+	"id" text PRIMARY KEY NOT NULL,
+	"organization_id" text NOT NULL,
+	"role" text NOT NULL,
+	"permission" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone
+);
+--> statement-breakpoint
 CREATE TABLE "organizations" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -454,6 +459,7 @@ CREATE TABLE "threads" (
 	"contact_id" text NOT NULL,
 	"mailbox_id" text NOT NULL,
 	"message_id" text NOT NULL,
+	"provider_message_id" text,
 	"client_request_id" text,
 	"in_reply_to" text,
 	"references" jsonb,
@@ -468,6 +474,8 @@ CREATE TABLE "threads" (
 	"text_body" text,
 	"html_body" text,
 	"headers" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"attachments" jsonb,
+	"provider_url" text,
 	"eml_key" text,
 	"sent_at" timestamp with time zone,
 	"received_at" timestamp with time zone,
@@ -532,6 +540,8 @@ CREATE INDEX "mailboxes_status_idx" ON "mailboxes" USING btree ("status");--> st
 CREATE INDEX "mailboxes_org_status_idx" ON "mailboxes" USING btree ("org_id","status");--> statement-breakpoint
 CREATE INDEX "mailboxes_org_archived_idx" ON "mailboxes" USING btree ("org_id","archived_at");--> statement-breakpoint
 CREATE INDEX "mailboxes_ramp_due_idx" ON "mailboxes" USING btree ("ramp_enabled","ramp_next_check_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "send_reservations_assignment_step_uq" ON "send_reservations" USING btree ("org_id","assignment_id","step_number");--> statement-breakpoint
+CREATE INDEX "send_reservations_mailbox_expiry_idx" ON "send_reservations" USING btree ("org_id","mailbox_id","expires_at");--> statement-breakpoint
 CREATE INDEX "notification_prefs_org_user_idx" ON "notification_prefs" USING btree ("org_id","user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "notification_prefs_org_user_unique" ON "notification_prefs" USING btree ("org_id","user_id");--> statement-breakpoint
 CREATE INDEX "notifications_org_id_idx" ON "notifications" USING btree ("org_id");--> statement-breakpoint
@@ -541,6 +551,8 @@ CREATE INDEX "invitations_email_idx" ON "invitations" USING btree ("email");--> 
 CREATE INDEX "members_organization_id_idx" ON "members" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "members_user_id_idx" ON "members" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "members_org_user_idx" ON "members" USING btree ("organization_id","user_id");--> statement-breakpoint
+CREATE INDEX "organization_roles_org_idx" ON "organization_roles" USING btree ("organization_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "organization_roles_org_role_uq" ON "organization_roles" USING btree ("organization_id","role");--> statement-breakpoint
 CREATE INDEX "organizations_slug_idx" ON "organizations" USING btree ("slug");--> statement-breakpoint
 CREATE INDEX "thread_reads_org_user_idx" ON "thread_reads" USING btree ("org_id","user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_reads_org_user_thread_idx" ON "thread_reads" USING btree ("org_id","user_id","thread_id");--> statement-breakpoint
@@ -605,6 +617,10 @@ CREATE POLICY "mailboxes_app_tenant" ON "mailboxes" AS PERMISSIVE FOR ALL TO "sa
 CREATE POLICY "mailboxes_worker_tenant" ON "mailboxes" AS PERMISSIVE FOR ALL TO "samrian_worker" USING (org_id = nullif(current_setting('app.org_id', true), '')) WITH CHECK (org_id = nullif(current_setting('app.org_id', true), ''));--> statement-breakpoint
 CREATE POLICY "mailboxes_worker_system_read" ON "mailboxes" AS PERMISSIVE FOR SELECT TO "samrian_worker" USING (current_setting('app.actor_type', true) = 'system');--> statement-breakpoint
 CREATE POLICY "mailboxes_worker_system_update" ON "mailboxes" AS PERMISSIVE FOR UPDATE TO "samrian_worker" USING (current_setting('app.actor_type', true) = 'system') WITH CHECK (current_setting('app.actor_type', true) = 'system');--> statement-breakpoint
+CREATE POLICY "send_reservations_app_tenant" ON "send_reservations" AS PERMISSIVE FOR ALL TO "samrian_app" USING (org_id = nullif(current_setting('app.org_id', true), '')) WITH CHECK (org_id = nullif(current_setting('app.org_id', true), ''));--> statement-breakpoint
+CREATE POLICY "send_reservations_worker_tenant" ON "send_reservations" AS PERMISSIVE FOR ALL TO "samrian_worker" USING (org_id = nullif(current_setting('app.org_id', true), '')) WITH CHECK (org_id = nullif(current_setting('app.org_id', true), ''));--> statement-breakpoint
+CREATE POLICY "send_reservations_worker_system_read" ON "send_reservations" AS PERMISSIVE FOR SELECT TO "samrian_worker" USING (current_setting('app.actor_type', true) = 'system');--> statement-breakpoint
+CREATE POLICY "send_reservations_worker_system_update" ON "send_reservations" AS PERMISSIVE FOR UPDATE TO "samrian_worker" USING (current_setting('app.actor_type', true) = 'system') WITH CHECK (current_setting('app.actor_type', true) = 'system');--> statement-breakpoint
 CREATE POLICY "notification_prefs_app_tenant" ON "notification_prefs" AS PERMISSIVE FOR ALL TO "samrian_app" USING (org_id = nullif(current_setting('app.org_id', true), '')) WITH CHECK (org_id = nullif(current_setting('app.org_id', true), ''));--> statement-breakpoint
 CREATE POLICY "notification_prefs_worker_tenant" ON "notification_prefs" AS PERMISSIVE FOR ALL TO "samrian_worker" USING (org_id = nullif(current_setting('app.org_id', true), '')) WITH CHECK (org_id = nullif(current_setting('app.org_id', true), ''));--> statement-breakpoint
 CREATE POLICY "notification_prefs_worker_system_read" ON "notification_prefs" AS PERMISSIVE FOR SELECT TO "samrian_worker" USING (current_setting('app.actor_type', true) = 'system');--> statement-breakpoint

@@ -1,13 +1,12 @@
 GRANT USAGE ON SCHEMA public TO samrian_app, samrian_auth, samrian_worker;
 
--- Better Auth owns these tables. Keeping this grant separate prevents auth
--- compromise from reaching tenant email data and worker compromise from
--- reaching session, OAuth-token, API-key, or JWKS records.
+-- Better Auth owns these tables. Auth credentials cannot access tenant email data.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "accounts" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "apikeys" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "invitations" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "jwks" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "members" TO samrian_auth;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "organization_roles" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "organizations" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "sessions" TO samrian_auth;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "users" TO samrian_auth;
@@ -29,6 +28,7 @@ ALTER TABLE "notification_prefs" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "notifications" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "org_settings" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "org_stats_daily" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "send_reservations" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "sender_domains" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "thread_reads" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "threads" FORCE ROW LEVEL SECURITY;
@@ -51,6 +51,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "notification_prefs" TO samrian_ap
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "notifications" TO samrian_app, samrian_worker;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "org_settings" TO samrian_app, samrian_worker;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "org_stats_daily" TO samrian_app, samrian_worker;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "send_reservations" TO samrian_app, samrian_worker;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "sender_domains" TO samrian_app, samrian_worker;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "thread_reads" TO samrian_app, samrian_worker;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "threads" TO samrian_app, samrian_worker;

@@ -1,6 +1,6 @@
 {
-  "id": "fe6824ae-ff14-4e4f-9046-62e214456aa8",
-  "prevId": "864b4c30-f2a2-4dea-a190-288e535e5e7e",
+  "id": "50847da8-6ef8-4a08-b31a-b30af9e2e649",
+  "prevId": "14db5e13-9d35-414c-8822-1b9ba1218220",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -58,9 +58,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -222,9 +222,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -352,9 +352,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "sender_domains_org_domain_idx": {
           "name": "sender_domains_org_domain_idx",
@@ -373,9 +373,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -512,9 +512,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "api_idempotency_expires_idx": {
           "name": "api_idempotency_expires_idx",
@@ -527,9 +527,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -672,9 +672,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "accounts_user_id_idx": {
           "name": "accounts_user_id_idx",
@@ -687,9 +687,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -854,9 +854,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "apikeys_reference_id_idx": {
           "name": "apikeys_reference_id_idx",
@@ -869,9 +869,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "apikeys_key_idx": {
           "name": "apikeys_key_idx",
@@ -884,9 +884,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1007,9 +1007,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "sessions_user_id_idx": {
           "name": "sessions_user_id_idx",
@@ -1022,9 +1022,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1132,9 +1132,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1199,9 +1199,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1278,9 +1278,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "blocklist_email_idx": {
           "name": "blocklist_email_idx",
@@ -1293,9 +1293,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1389,9 +1389,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "campaign_mailboxes_mailbox_id_idx": {
           "name": "campaign_mailboxes_mailbox_id_idx",
@@ -1404,9 +1404,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "campaign_mailboxes_org_id_idx": {
           "name": "campaign_mailboxes_org_id_idx",
@@ -1419,9 +1419,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "campaign_mailboxes_org_campaign_mailbox_uq": {
           "name": "campaign_mailboxes_org_campaign_mailbox_uq",
@@ -1446,9 +1446,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1591,9 +1591,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "campaigns_org_status_idx": {
           "name": "campaigns_org_status_idx",
@@ -1612,9 +1612,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1760,9 +1760,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_assignments_contact_id_idx": {
           "name": "contact_assignments_contact_id_idx",
@@ -1775,9 +1775,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_assignments_org_id_idx": {
           "name": "contact_assignments_org_id_idx",
@@ -1790,9 +1790,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_assignments_org_status_next_send_idx": {
           "name": "contact_assignments_org_status_next_send_idx",
@@ -1817,9 +1817,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_assignments_contact_campaign_idx": {
           "name": "contact_assignments_contact_campaign_idx",
@@ -1838,9 +1838,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_assignments_org_campaign_contact_uq": {
           "name": "contact_assignments_org_campaign_contact_uq",
@@ -1865,9 +1865,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2003,9 +2003,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_groups_org_name_idx": {
           "name": "contact_groups_org_name_idx",
@@ -2024,9 +2024,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contact_groups_org_created_idx": {
           "name": "contact_groups_org_created_idx",
@@ -2045,9 +2045,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2185,9 +2185,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contacts_org_domain_idx": {
           "name": "contacts_org_domain_idx",
@@ -2206,9 +2206,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contacts_org_bounce_idx": {
           "name": "contacts_org_bounce_idx",
@@ -2227,9 +2227,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contacts_org_verification_idx": {
           "name": "contacts_org_verification_idx",
@@ -2248,9 +2248,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contacts_org_created_idx": {
           "name": "contacts_org_created_idx",
@@ -2275,9 +2275,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "contacts_custom_vars_gin_idx": {
           "name": "contacts_custom_vars_gin_idx",
@@ -2290,9 +2290,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gin",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2462,9 +2462,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "campaign_stats_daily_org_campaign_day_idx": {
           "name": "campaign_stats_daily_org_campaign_day_idx",
@@ -2489,9 +2489,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2640,9 +2640,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "email_events_org_occurred_idx": {
           "name": "email_events_org_occurred_idx",
@@ -2661,9 +2661,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "email_events_campaign_occurred_idx": {
           "name": "email_events_campaign_occurred_idx",
@@ -2688,9 +2688,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "email_events_mailbox_occurred_idx": {
           "name": "email_events_mailbox_occurred_idx",
@@ -2715,9 +2715,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "email_events_type_occurred_idx": {
           "name": "email_events_type_occurred_idx",
@@ -2742,9 +2742,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "email_events_message_id_idx": {
           "name": "email_events_message_id_idx",
@@ -2757,9 +2757,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -2929,9 +2929,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "mailbox_stats_daily_org_mailbox_day_idx": {
           "name": "mailbox_stats_daily_org_mailbox_day_idx",
@@ -2956,9 +2956,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -3116,9 +3116,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "org_stats_daily_org_day_idx": {
           "name": "org_stats_daily_org_day_idx",
@@ -3137,9 +3137,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -3257,9 +3257,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "tracked_links_org_campaign_idx": {
           "name": "tracked_links_org_campaign_idx",
@@ -3278,9 +3278,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -3592,9 +3592,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "mailboxes_status_idx": {
           "name": "mailboxes_status_idx",
@@ -3607,9 +3607,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "mailboxes_org_status_idx": {
           "name": "mailboxes_org_status_idx",
@@ -3628,9 +3628,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "mailboxes_org_archived_idx": {
           "name": "mailboxes_org_archived_idx",
@@ -3649,9 +3649,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "mailboxes_ramp_due_idx": {
           "name": "mailboxes_ramp_due_idx",
@@ -3670,9 +3670,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -3710,6 +3710,157 @@
         },
         "mailboxes_worker_system_update": {
           "name": "mailboxes_worker_system_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "samrian_worker"
+          ],
+          "using": "current_setting('app.actor_type', true) = 'system'",
+          "withCheck": "current_setting('app.actor_type', true) = 'system'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.send_reservations": {
+      "name": "send_reservations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mailbox_id": {
+          "name": "mailbox_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assignment_id": {
+          "name": "assignment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "step_number": {
+          "name": "step_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "send_reservations_assignment_step_uq": {
+          "name": "send_reservations_assignment_step_uq",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "assignment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "step_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "send_reservations_mailbox_expiry_idx": {
+          "name": "send_reservations_mailbox_expiry_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mailbox_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "send_reservations_app_tenant": {
+          "name": "send_reservations_app_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "samrian_app"
+          ],
+          "using": "org_id = nullif(current_setting('app.org_id', true), '')",
+          "withCheck": "org_id = nullif(current_setting('app.org_id', true), '')"
+        },
+        "send_reservations_worker_tenant": {
+          "name": "send_reservations_worker_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "samrian_worker"
+          ],
+          "using": "org_id = nullif(current_setting('app.org_id', true), '')",
+          "withCheck": "org_id = nullif(current_setting('app.org_id', true), '')"
+        },
+        "send_reservations_worker_system_read": {
+          "name": "send_reservations_worker_system_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "samrian_worker"
+          ],
+          "using": "current_setting('app.actor_type', true) = 'system'"
+        },
+        "send_reservations_worker_system_update": {
+          "name": "send_reservations_worker_system_update",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": [
@@ -3805,9 +3956,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "notification_prefs_org_user_unique": {
           "name": "notification_prefs_org_user_unique",
@@ -3826,9 +3977,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -3940,9 +4091,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "notifications_user_id_idx": {
           "name": "notifications_user_id_idx",
@@ -3955,9 +4106,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4056,9 +4207,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "invitations_email_idx": {
           "name": "invitations_email_idx",
@@ -4071,9 +4222,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4131,9 +4282,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "members_user_id_idx": {
           "name": "members_user_id_idx",
@@ -4146,9 +4297,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "members_org_user_idx": {
           "name": "members_org_user_idx",
@@ -4167,9 +4318,96 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_roles": {
+      "name": "organization_roles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "permission": {
+          "name": "permission",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "organization_roles_org_idx": {
+          "name": "organization_roles_org_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "organization_roles_org_role_uq": {
+          "name": "organization_roles_org_role_uq",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4233,9 +4471,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4299,9 +4537,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "thread_reads_org_user_thread_idx": {
           "name": "thread_reads_org_user_thread_idx",
@@ -4326,9 +4564,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4407,6 +4645,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "provider_message_id": {
+          "name": "provider_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "client_request_id": {
           "name": "client_request_id",
@@ -4494,6 +4738,18 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
+        "attachments": {
+          "name": "attachments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_url": {
+          "name": "provider_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "eml_key": {
           "name": "eml_key",
           "type": "text",
@@ -4532,9 +4788,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_org_direction_idx": {
           "name": "threads_org_direction_idx",
@@ -4553,9 +4809,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_campaign_id_idx": {
           "name": "threads_campaign_id_idx",
@@ -4568,9 +4824,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_campaign_direction_idx": {
           "name": "threads_campaign_direction_idx",
@@ -4589,9 +4845,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_contact_id_idx": {
           "name": "threads_contact_id_idx",
@@ -4604,9 +4860,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_message_id_idx": {
           "name": "threads_message_id_idx",
@@ -4619,9 +4875,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_org_message_id_idx": {
           "name": "threads_org_message_id_idx",
@@ -4640,9 +4896,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_org_client_request_idx": {
           "name": "threads_org_client_request_idx",
@@ -4661,9 +4917,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "threads_org_provider_thread_idx": {
           "name": "threads_org_provider_thread_idx",
@@ -4682,9 +4938,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4853,10 +5109,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},
