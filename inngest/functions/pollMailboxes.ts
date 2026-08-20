@@ -1,4 +1,4 @@
-import { inngest } from "../client";
+import { inngest, inngestConcurrency } from "../client";
 import { createWorkerDeps } from "../../src/server/worker";
 import { createInngestQueue } from "../lib/jobs";
 import type { MailboxPollPayload } from "../../src/server/jobs/types";
@@ -6,6 +6,7 @@ import type { MailboxPollPayload } from "../../src/server/jobs/types";
 export const pollMailboxes = inngest.createFunction(
   {
     id: "poll-mailboxes",
+    concurrency: inngestConcurrency,
     triggers: [{ cron: "*/5 * * * *" }, { event: "mailbox/poll/all" }],
   },
   async ({ step }) => {
@@ -17,9 +18,7 @@ export const pollSingleMailbox = inngest.createFunction(
   {
     id: "poll-single-mailbox",
     triggers: [{ event: "mailbox/poll/single" }],
-    concurrency: {
-      limit: 5,
-    },
+    concurrency: inngestConcurrency,
   },
   async ({ event, step }) => {
     return await step.run("poll-single-mailbox", () =>

@@ -1,4 +1,4 @@
-import { inngest } from "../client";
+import { inngest, inngestConcurrency } from "../client";
 import { createWorkerDeps } from "../../src/server/worker";
 import type { BouncePayload } from "../../src/server/jobs/types";
 
@@ -16,6 +16,7 @@ import type { BouncePayload } from "../../src/server/jobs/types";
 export const processBounce = inngest.createFunction(
   {
     id: "process-bounce",
+    concurrency: inngestConcurrency,
     retries: 3,
     triggers: [{ event: "email/bounce" }],
   },

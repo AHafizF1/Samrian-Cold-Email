@@ -1,4 +1,4 @@
-import { inngest } from "../client";
+import { inngest, inngestConcurrency } from "../client";
 import { createWorkerDeps } from "../../src/server/worker";
 import type { CampaignSendPayload } from "../../src/server/jobs/types";
 
@@ -11,6 +11,7 @@ import type { CampaignSendPayload } from "../../src/server/jobs/types";
 export const sendCampaignEmail = inngest.createFunction(
   {
     id: "send-campaign-email",
+    concurrency: inngestConcurrency,
     retries: 3,
     triggers: [{ event: "campaign/send" }],
   },

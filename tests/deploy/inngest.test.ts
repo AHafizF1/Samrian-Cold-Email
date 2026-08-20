@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 
 import { describe, expect, test } from "vitest";
 
@@ -37,5 +37,19 @@ describe("local Inngest runtime", () => {
 
     expect(deps).not.toContain("const jobs = queue ?? createJobQueue()");
     expect(deps).toContain("const getQueue = () => queue ?? createJobQueue()");
+  });
+
+  test("shares one configured account concurrency budget across functions", async () => {
+    const files = await readdir("inngest/functions");
+    const sources = await Promise.all(
+      files
+        .filter((file) => file.endsWith(".ts"))
+        .map((file) => readFile(`inngest/functions/${file}`, "utf8"))
+    );
+
+    const functions = sources.join("\n").match(/inngest\.createFunction\(/g) ?? [];
+    const limits = sources.join("\n").match(/concurrency: inngestConcurrency/g) ?? [];
+
+    expect(limits).toHaveLength(functions.length);
   });
 });

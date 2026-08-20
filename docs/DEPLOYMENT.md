@@ -138,7 +138,8 @@ Current provider references:
    also sets non-owner `AUTH_DATABASE_URL`; WorkOS mode omits it. Keep owner `DATABASE_URL` only in
    migration job.
 4. Set `JOB_PROVIDER=inngest`.
-5. Set `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`.
+5. Set `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, and `INNGEST_CONCURRENCY`. Use `5` for
+   Inngest Free so every Samrian function shares one account-scoped budget.
 6. Configure S3-compatible storage with AWS S3, Cloudflare R2, Backblaze B2, or another provider.
 7. Run migrations before release:
 

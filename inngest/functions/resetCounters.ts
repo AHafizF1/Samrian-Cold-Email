@@ -1,4 +1,4 @@
-import { inngest } from "../client";
+import { inngest, inngestConcurrency } from "../client";
 import { createWorkerDeps } from "../../src/server/worker";
 
 /**
@@ -9,7 +9,11 @@ import { createWorkerDeps } from "../../src/server/worker";
  * which is a system-level operation with no user/org context.
  */
 export const resetCounters = inngest.createFunction(
-  { id: "reset-counters", triggers: [{ cron: "0 0 * * *" }] },
+  {
+    id: "reset-counters",
+    concurrency: inngestConcurrency,
+    triggers: [{ cron: "0 0 * * *" }],
+  },
   async ({ step }) => {
     return await step.run("reset-mailbox-counters", async () => createWorkerDeps().resetCounters());
   }
