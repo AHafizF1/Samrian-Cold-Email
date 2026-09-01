@@ -28,6 +28,10 @@ const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"
 
 export type GoogleAuthMode = "sign-in" | "sign-up";
 
+export function isHostedAuth() {
+  return authProvider === "workos";
+}
+
 export function isGoogleSignInAvailable() {
   return authProvider === "workos" || googleAuthEnabled;
 }

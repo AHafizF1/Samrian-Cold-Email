@@ -23,6 +23,24 @@ describe("auth client facade", () => {
     expect(source).toContain("signOut");
   });
 
+  test("hosted auth pages do not render local credential forms", async () => {
+    const signIn = await readFile("src/app/sign-in/page.tsx", "utf8");
+    const signUp = await readFile("src/app/sign-up/page.tsx", "utf8");
+    const hosted = await readFile("src/components/hosted-auth.tsx", "utf8");
+
+    expect(signIn).toContain("isHostedAuth");
+    expect(signUp).toContain("isHostedAuth");
+    expect(signIn).toContain("HostedAuth");
+    expect(signUp).toContain("HostedAuth");
+    expect(hosted).toContain("Continue with WorkOS");
+  });
+
+  test("WorkOS proxy leaves machine API authorization to API v1", async () => {
+    const proxy = await readFile("src/proxy.ts", "utf8");
+
+    expect(proxy).toContain('"/api/v1/:path*"');
+  });
+
   test("keeps user Google auth separate from Gmail mailbox OAuth", async () => {
     const config = await readFile("src/server/auth/config.ts", "utf8");
     const mailbox = await readFile("src/app/api/auth/google/route.ts", "utf8");

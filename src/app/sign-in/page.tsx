@@ -3,7 +3,13 @@
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { isGoogleSignInAvailable, signInWithEmail, signInWithGoogle } from "@/lib/auth";
+import {
+  isGoogleSignInAvailable,
+  isHostedAuth,
+  signInWithEmail,
+  signInWithGoogle,
+} from "@/lib/auth";
+import { HostedAuth } from "@/components/hosted-auth";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
@@ -16,6 +22,10 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const googleSignInAvailable = isGoogleSignInAvailable();
+
+  if (isHostedAuth()) {
+    return <HostedAuth mode="sign-in" />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

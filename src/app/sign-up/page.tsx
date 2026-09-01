@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   createOrganization,
   isGoogleSignInAvailable,
+  isHostedAuth,
   setActiveOrganization,
   signInWithGoogle,
   signUpWithEmail,
 } from "@/lib/auth";
+import { HostedAuth } from "@/components/hosted-auth";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
@@ -25,6 +27,10 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const googleSignInAvailable = isGoogleSignInAvailable();
+
+  if (isHostedAuth()) {
+    return <HostedAuth mode="sign-up" />;
+  }
 
   const generateSlug = (value: string) =>
     value
